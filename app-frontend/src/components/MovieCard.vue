@@ -1,7 +1,7 @@
 <template>
   <article class="card" :title="`${movie.primaryTitle} (${movie.startYear})`">
     <img
-      :src="movie.poster_path"
+      :src="posterSrc"
       :alt="movie.primaryTitle"
       loading="lazy"
       @error="onError"
@@ -14,9 +14,20 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   movie: { type: Object, required: true }
 })
+
+// Ruta del backend
+const BACKEND_BASE = 'http://127.0.0.1:8000'
+
+const posterSrc = computed(() => {
+  const p = props.movie?.poster_path
+  return BACKEND_BASE + '/' + p
+})
+
 function onError(e) {
   // fallback mínimo si falta la imagen
   e.target.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(

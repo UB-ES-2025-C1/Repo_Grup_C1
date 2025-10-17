@@ -43,6 +43,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import MovieCard from '@/components/MovieCard.vue'
+import axios from 'axios'
 
 const loading = ref(true)
 const error = ref('')
@@ -102,10 +103,10 @@ function onSearch(){ /* debounce opcional */ }
 
 onMounted(async () => {
   try {
-    // Ajusta la ruta a tu JSON (ya lo tenías así)
-    const res = await fetch('/reduced_database/movies_enriched.json', { cache: 'no-cache' })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    movies.value = await res.json()
+    // Pide los datos de pelis del backend
+    const res = await axios.get('http://127.0.0.1:8000/movies/');
+    if (res.status !== 200) throw new Error(`HTTP ${res.status}`)
+    movies.value = res.data
   } catch (e) {
     console.error('Dataset load error:', e)
     error.value = e.message || 'Unknown error'

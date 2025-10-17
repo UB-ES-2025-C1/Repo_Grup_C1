@@ -32,6 +32,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders', # ¡Importante que esté al principio!
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware', # ¡Importante que esté al principio!
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -129,3 +131,9 @@ MEDIA_URL = '/media/'
 
 # Ruta en el sistema de archivos donde se guardarán los archivos subidos
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Configuración de CORS
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",      # Si tu Vue app corre en localhost:5173
+    "http://127.0.0.1:5173",      # Otra posible dirección local
+]
