@@ -103,7 +103,7 @@ function onSearch(){ /* debounce opcional */ }
 
 onMounted(async () => {
   try {
-    // Ajusta la ruta a tu JSON (ya lo tenías así)
+    // Pide los datos de pelis del backend
     const res = await axios.get('http://127.0.0.1:8000/movies/');
     if (res.status !== 200) throw new Error(`HTTP ${res.status}`)
     movies.value = res.data
