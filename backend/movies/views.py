@@ -25,4 +25,4 @@ class MovieDetailAPIView(generics.RetrieveAPIView):
     """
     serializer_class = MovieSerializer
     queryset = Movie.objects.all()
-    lookup_field = 'tconst'  # Le decimos a DRF que use 'tconst' para buscar en lugar del ID
+    lookup_field = 'tconst'  # Le decimos a DRF que use 'tconst' para buscar en lugar del IDÑ
