@@ -1,123 +1,105 @@
 <template>
+  <!-- Usamos el header que ya tienes definido -->
   <header class="header">
-    <div class="brand" @click="goHome" style="cursor: pointer;">
+    <router-link to="/" class="brand">
       <span class="dot"></span> CINEMA UB
+    </router-link>
+  </header>
+
+  <div class="container">
+    <!-- Estado de carga -->
+    <div v-if="loading" class="empty">Loading movie...</div>
+
+    <!-- Estado de error -->
+    <div v-else-if="error" class="empty">
+      ⚠️ Movie not found.
     </div>
-  </header>    
-
-  <main class="movie-info" v-if="movie">
-    <header class="header">
-      <h1>{{ movie.primaryTitle }} ({{ movie.startYear }})</h1>
-    </header>
-
-    <section class="content">
-      <img
-        :src="movie.poster_path"
-        :alt="movie.primaryTitle"
-        class="poster"
-        @error="onError"
-      />
-      <div class="details">
+    
+    <!-- Contenido cuando la película ha cargado -->
+    <div v-else-if="movie" class="movie-details">
+      <div class="poster">
+        <img :src="API_BASE_URL + movie.poster_path" :alt="`Poster of ${movie.primaryTitle}`" />
+      </div>
+      <div class="info">
+        <h1>{{ movie.primaryTitle }} ({{ movie.startYear }})</h1>
         <p class="description">{{ movie.description }}</p>
         <ul class="stats">
-          <li><strong>⭐ Rating:</strong> {{ movie.average_rating }}</li>
-          <li><strong>👥 Votes:</strong> {{ movie.numVotes.toLocaleString() }}</li>
+          <li>⭐ Rating: <strong>{{ movie.average_rating }}</strong></li>
+          <li>👥 Votes: <strong>{{ movie.numVotes.toLocaleString() }}</strong></li>
         </ul>
       </div>
-    </section>
-  </main>
-
-  <section v-else class="empty">
-    <p>⚠️ Movie not found.</p>
-  </section>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue';
+import axios from 'axios';
 
-const route = useRoute()
-const router = useRouter()  // 👈 necesario para navegar
-const movie = ref(null)
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
+// 1. Recibimos 'tconst' como una prop gracias a `props: true` en el router
+const props = defineProps({
+  tconst: {
+    type: String,
+    required: true,
+  },
+});
+
+// 2. Definimos las variables de estado
+const movie = ref(null);
+const loading = ref(true);
+const error = ref(null);
+
+// 3. Cuando el componente se monta, llamamos a la API
 onMounted(async () => {
   try {
-    const res = await fetch('/reduced_database/movies_enriched.json', { cache: 'no-cache' })
-    const data = await res.json()
-    movie.value = data.find(m => m.tconst === route.params.tconst)
-  } catch (e) {
-    console.error('Error loading movie info:', e)
+    // Usamos el 'tconst' de las props para construir la URL de la API
+    const response = await axios.get(`http://127.0.0.1:8000/movies/${props.tconst}/`);
+    movie.value = response.data;
+  } catch (err) {
+    console.error(err);
+    error.value = 'Could not fetch movie details.';
+  } finally {
+    loading.value = false;
   }
-})
-
-function onError(e) {
-  e.target.src =
-    'data:image/svg+xml;utf8,' +
-    encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600">
-        <rect width="100%" height="100%" fill="#111820"/>
-        <text x="50%" y="50%" fill="#7c8aa5" font-family="Arial" font-size="20" text-anchor="middle">No image</text>
-      </svg>`
-    )
-}
-
-// 🔹 Función para volver a Home al hacer clic en CINEMA UB
-function goHome() {
-  router.push('/')
-}
+});
 </script>
 
 <style scoped>
-.movie-info {
-  max-width: 900px;
-  margin: 2rem auto;
-  padding: 1rem;
-  color: #eaeaea;
-}
-
-.header {
-  margin-bottom: 2rem;
-}
-
-.brand:hover {
-  opacity: 0.8;
-}
-
-h1 {
-  font-size: 1.8rem;
-  margin: 0;
-}
-
-.content {
-  display: flex;
-  flex-wrap: wrap;
+/* Estilos específicos para esta vista */
+.movie-details {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 2rem;
+  padding: 2rem 0;
 }
 
-.poster {
-  width: 280px;
-  border-radius: 0.75rem;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-  object-fit: cover;
+@media (min-width: 768px) {
+  .movie-details {
+    grid-template-columns: 300px 1fr;
+  }
 }
 
-.details {
-  flex: 1;
-  min-width: 240px;
+.poster img {
+  width: 100%;
+  border-radius: 12px;
+}
+
+.info h1 {
+  margin-top: 0;
 }
 
 .description {
-  margin-bottom: 1rem;
-  line-height: 1.5;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .stats {
   list-style: none;
   padding: 0;
-}
-
-.empty {
-  text-align: center;
-  margin-top: 3rem;
+  display: flex;
+  gap: 1.5rem;
+  font-size: 1.1rem;
 }
 </style>

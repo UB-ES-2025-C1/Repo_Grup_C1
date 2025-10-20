@@ -1,60 +1,48 @@
 <template>
-  <article
-    class="card"
-    :title="`${movie.primaryTitle} (${movie.startYear})`"
-    @click="goToInfo"
-  >
+  <!-- El router-link permite hacer clic en toda la tarjeta -->
+  <router-link :to="{ name: 'movie-info', params: { tconst: movie.tconst } }" class="card">
+    
+    <!-- Usamos v-if para mostrar un póster solo si la ruta existe -->
     <img
-      :src="posterSrc"
-      :alt="movie.primaryTitle"
+      v-if="movie.poster_path"
+      :src="API_BASE_URL + movie.poster_path" 
+      :alt="`Poster of ${movie.primaryTitle}`"
       loading="lazy"
-      @error="onError"
     />
-    <div class="meta">
-      <h3>
-        {{ movie.primaryTitle }}
-        <small>({{ movie.startYear }})</small>
-      </h3>
-      <small v-if="movie.average_rating">
-        Rating: <strong>{{ movie.average_rating }}</strong>
-      </small>
+    <!-- Mostramos un espacio reservado si no hay póster -->
+    <div v-else class="poster-placeholder">
+      <span>No image</span>
     </div>
-  </article>
+
+    <div class="meta">
+      <h3>{{ movie.primaryTitle }} ({{ movie.startYear }})</h3>
+      <small>Rating: {{ movie.average_rating }}</small>
+    </div>
+  </router-link>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+// La URL base de tu backend
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
-const props = defineProps({
-  movie: { type: Object, required: true }
-})
-
-// Ruta del backend
-const BACKEND_BASE = 'http://127.0.0.1:8000'
-
-const posterSrc = computed(() => {
-  const p = props.movie?.poster_path
-  return BACKEND_BASE + '/' + p
-})
-
-function onError(e) {
-  e.target.src =
-    'data:image/svg+xml;utf8,' +
-    encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600">
-        <rect width="100%" height="100%" fill="#111820"/>
-        <text x="50%" y="50%" fill="#7c8aa5" font-family="Arial" font-size="20" text-anchor="middle">No image</text>
-      </svg>`
-    )
-}
+// El componente recibe el objeto 'movie'
+defineProps({
+  movie: {
+    type: Object,
+    required: true,
+  },
+});
 </script>
 
 <style scoped>
-.card {
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-.card:hover {
-  transform: scale(1.03);
+/* Un estilo simple para el póster de reserva */
+.poster-placeholder {
+  aspect-ratio: 2/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1f2937; /* Un gris oscuro */
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 </style>
