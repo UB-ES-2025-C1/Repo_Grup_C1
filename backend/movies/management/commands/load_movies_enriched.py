@@ -42,6 +42,7 @@ class Command(BaseCommand):
             poster_path = item.get('poster_path')
             poster_attribution = item.get('poster_attribution')
             num_votes = item.get('numVotes') or item.get('num_votes') or 0
+            imdb_rating = item.get('imdbRating') or item.get('imdb_rating') or 0.0
 
             movie, created_flag = Movie.objects.get_or_create(
                 tconst=tconst,
@@ -52,6 +53,7 @@ class Command(BaseCommand):
                     'poster_path': poster_path,
                     'poster_attribution': poster_attribution,
                     'num_votes': num_votes,
+                    'imdb_rating': imdb_rating,
                 }
             )
 
@@ -74,6 +76,9 @@ class Command(BaseCommand):
                     changed = True
                 if num_votes and movie.num_votes != num_votes:
                     movie.num_votes = num_votes
+                    changed = True
+                if imdb_rating and movie.imdb_rating != imdb_rating:
+                    movie.imdb_rating = imdb_rating
                     changed = True
                 if changed:
                     movie.save()

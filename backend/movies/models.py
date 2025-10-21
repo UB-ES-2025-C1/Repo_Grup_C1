@@ -33,14 +33,36 @@ class Movie(models.Model):
     # Cached number of votes (optional). If 0, we can compute it from ratings.
     num_votes = models.IntegerField(default=0)
 
+    # Rating from IMDb
+    imdb_rating = models.FloatField(default=0.0)
+
     def __str__(self):
         return self.primary_title or self.title or self.tconst or super().__str__()
 
     @property
     def average_rating(self):
-        """Compute average rating from related Rating objects."""
-        avg = self.ratings.aggregate(Avg('score')).get('score__avg')
-        return round(avg, 1) if avg is not None else 0
+        """
+        Return average between the external IMDb rating (`imdb_rating`)
+        and the local ratings stored in the `Rating` related objects.
+
+        Formula:
+            combined = (imdb_rating * 0.5) + (avg_local * 0.5)
+        """
+        # local average and count
+        agg = self.ratings.aggregate(avg_score=Avg('score'))
+        avg_local = agg.get('avg_score')
+        imdb = getattr(self, 'imdb_rating', None) or 0.0
+
+        # If no local ratings, return imdb rating (if present)
+        if not avg_local:
+            return round(imdb, 1) if imdb else 0
+
+        # If imdb rating is not provided (0), return local average
+        if not imdb:
+            return round(avg_local, 1) if avg_local is not None else 0
+
+        combined = (imdb * 0.5) + (avg_local * 0.5)
+        return round(combined, 1)
 
     @property
     def numVotes(self):

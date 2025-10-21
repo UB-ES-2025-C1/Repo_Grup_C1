@@ -12,9 +12,7 @@ cd backend
 
 ### Dependencias del backend
 ```
-pip install django
-pip install djangorestframework
-pip install django-cors-headers
+pip install -r requirements.txt
 ```
 
 ### Prepara la base de datos y carga la database reducida
