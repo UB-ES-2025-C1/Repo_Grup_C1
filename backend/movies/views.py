@@ -18,11 +18,3 @@ class MovieListAPIView(generics.ListAPIView):
         return Movie.objects.annotate(
             avg_rating=Avg('ratings__score')
         ).order_by('-avg_rating')
-
-class MovieDetailAPIView(generics.RetrieveAPIView):
-    """
-    API View para ver los detalles de una película específica.
-    """
-    serializer_class = MovieSerializer
-    queryset = Movie.objects.all()
-    lookup_field = 'tconst'  # Le decimos a DRF que use 'tconst' para buscar en lugar del IDÑ
