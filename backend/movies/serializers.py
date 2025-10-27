@@ -1,6 +1,30 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
+from django.contrib.auth.models import User
 from .models import Movie
 from django.db.models import Avg
+
+
+class UserSerializer(serializers.ModelSerializer):
+    # El email es obligatorio y único
+    email = serializers.EmailField(
+        required=True,
+        validators=[UniqueValidator(queryset=User.objects.all())]
+    )
+    # La contraseña es write only para no permitir su lectura
+    password = serializers.CharField(write_only=True, min_length=6)
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password']
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=validated_data['password']
+        )
+        return user
 
 
 class MovieSerializer(serializers.ModelSerializer):

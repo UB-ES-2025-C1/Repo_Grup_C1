@@ -1,8 +1,18 @@
 from django.shortcuts import render
 from rest_framework import generics
+from django.contrib.auth.models import User
 from .models import Movie
-from .serializers import MovieSerializer
+from .serializers import UserSerializer, MovieSerializer
 from django.db.models import Avg
+
+
+class UserRegisterAPIView(generics.CreateAPIView):
+    """
+    This viewset automatically provides `list` and `retrieve` actions.
+    """
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
 
 class MovieListAPIView(generics.ListAPIView):
     """
@@ -18,3 +28,12 @@ class MovieListAPIView(generics.ListAPIView):
         return Movie.objects.annotate(
             avg_rating=Avg('ratings__score')
         ).order_by('-avg_rating')
+    
+
+class MovieDetailAPIView(generics.RetrieveAPIView):
+    """
+    API View para ver los detalles de una película específica.
+    """
+    serializer_class = MovieSerializer
+    queryset = Movie.objects.all()
+    lookup_field = 'tconst'  # Le decimos a DRF que use 'tconst' para buscar en lugar del IDÑ
