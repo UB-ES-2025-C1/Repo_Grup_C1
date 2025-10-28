@@ -16,6 +16,14 @@ class Movie(models.Model):
     primary_title = models.CharField(max_length=200, null=True, blank=True)
 
     director = models.CharField(max_length=100, null=True, blank=True)
+    # Géneros (lista separada por comas). Se deja como CharField simple
+    # por ahora; si se necesita búsquedas/relaciones más ricas se puede
+    # reemplazar por un modelo ManyToMany (Genre) más adelante.
+    genres = models.CharField(max_length=300, null=True, blank=True)
+
+    # Actores principales / reparto. Almacenado como cadena separada por
+    # comas para evitar introducir nuevas tablas por el momento.
+    actors = models.CharField(max_length=1000, null=True, blank=True)
 
     # Year as string to allow unknown/partial values
     start_year = models.CharField(max_length=10, null=True, blank=True)
@@ -29,9 +37,6 @@ class Movie(models.Model):
 
     # Optional local image field (kept for backwards compatibility)
     image = models.ImageField(upload_to='movie_images/', null=True, blank=True)
-
-    # Cached number of votes (optional). If 0, we can compute it from ratings.
-    num_votes = models.IntegerField(default=0)
 
     # Rating from IMDb
     imdb_rating = models.FloatField(default=0.0)
@@ -66,12 +71,7 @@ class Movie(models.Model):
 
     @property
     def numVotes(self):
-        """Return cached num_votes if present, otherwise count related ratings."""
-        try:
-            if self.num_votes:
-                return self.num_votes
-        except Exception:
-            pass
+        """Return the count of local ratings for this movie."""
         return self.ratings.count()
 
 
