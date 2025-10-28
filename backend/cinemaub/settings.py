@@ -137,3 +137,19 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",      # Si tu Vue app corre en localhost:5173
     "http://127.0.0.1:5173",      # Otra posible dirección local
 ]
+
+# Permitir credenciales en peticiones CORS
+CORS_ALLOW_CREDENTIALS = True
+
+# Headers permitidos
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
