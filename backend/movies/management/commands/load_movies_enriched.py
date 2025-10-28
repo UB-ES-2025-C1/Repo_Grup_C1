@@ -41,8 +41,16 @@ class Command(BaseCommand):
             description = item.get('description')
             poster_path = item.get('poster_path')
             poster_attribution = item.get('poster_attribution')
-            num_votes = item.get('numVotes') or item.get('num_votes') or 0
             imdb_rating = item.get('imdbRating') or item.get('imdb_rating') or 0.0
+            director = item.get('director') or ''
+            genres = item.get('genres') or ''
+            actors = item.get('actors') or ''
+            
+            # Si genres o actors vienen como listas en el JSON, convertirlas a cadena separada por comas
+            if isinstance(genres, list):
+                genres = ', '.join(genres)
+            if isinstance(actors, list):
+                actors = ', '.join(actors)
 
             movie, created_flag = Movie.objects.get_or_create(
                 tconst=tconst,
@@ -52,8 +60,10 @@ class Command(BaseCommand):
                     'description': description,
                     'poster_path': poster_path,
                     'poster_attribution': poster_attribution,
-                    'num_votes': num_votes,
                     'imdb_rating': imdb_rating,
+                    'director': director,
+                    'genres': genres,
+                    'actors': actors,
                 }
             )
 
@@ -74,11 +84,17 @@ class Command(BaseCommand):
                 if poster_attribution and movie.poster_attribution != poster_attribution:
                     movie.poster_attribution = poster_attribution
                     changed = True
-                if num_votes and movie.num_votes != num_votes:
-                    movie.num_votes = num_votes
-                    changed = True
                 if imdb_rating and movie.imdb_rating != imdb_rating:
                     movie.imdb_rating = imdb_rating
+                    changed = True
+                if director and movie.director != director:
+                    movie.director = director
+                    changed = True
+                if genres and movie.genres != genres:
+                    movie.genres = genres
+                    changed = True
+                if actors and movie.actors != actors:
+                    movie.actors = actors
                     changed = True
                 if changed:
                     movie.save()
