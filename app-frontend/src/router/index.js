@@ -1,15 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
-import MovieInfo from '@/views/MovieInfo.vue' // 👈 importa el nuevo componente
+import MovieInfo from '@/views/MovieInfo.vue'
+import LoginView from '@/views/LoginView.vue'   
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
   {
-    path: '/movie/:tconst',     // 👈 nueva ruta dinámica
+    path: '/movie/:tconst',
     name: 'movie-info',
     component: MovieInfo,
     props: true
-  }
+  },
+  { path: '/login', name: 'login', component: LoginView } 
 ]
 
 const router = createRouter({
