@@ -1,30 +1,64 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+from django.core.validators import RegexValidator
 from django.contrib.auth.models import User
 from .models import Movie
 from django.db.models import Avg
 
 
-class UserSerializer(serializers.ModelSerializer):
-    # El email es obligatorio y único
+class UserRegisterSerializer(serializers.ModelSerializer):
+    # El usuario es obligatorio, único y no puede estar vacío
+    username = serializers.CharField(
+        required=True,
+        error_messages={
+            'required': "El nom d'usuari és obligatori.",
+            'blank': "El nom d'usuari no pot estar buit."
+        },
+        validators=[
+            UniqueValidator(queryset=User.objects.all(),
+                            message="El nom d'usuari ja està en ús.")
+        ]
+    )
+
+    # El email es obligatorio, único y tiene que estar en un formato correcto
     email = serializers.EmailField(
         required=True,
-        validators=[UniqueValidator(queryset=User.objects.all())]
+        error_messages={
+            'required': 'El correu electrònic és obligatori.',
+            'blank': 'El correu electrònic no pot estar buit.',
+            'invalid': 'El correu electrònic no té un format vàlid.'
+        },
+        validators=[
+            UniqueValidator(queryset=User.objects.all(),
+                            message='El correu electrònic ja està en ús.')
+        ]
     )
-    # La contraseña es write only para no permitir su lectura
-    password = serializers.CharField(write_only=True, min_length=6)
+
+    # La contraseña es write only y se valida que sea válida con regex
+    # Tiene que tener entre 8 y 30 carácteres y contener al menos una mayúscula, una minúscula y un número
+    password = serializers.CharField(
+        required=True,
+        write_only=True,
+        min_length=8,
+        max_length=30,
+        error_messages={
+            'required': 'La contrasenya és obligatòria.',
+            'min_length': 'La contrasenya ha de tenir al menys 8 caràcters.',
+            'max_length': 'La contrasenya no pot tenir més de 30 caràcters.'
+        },
+        validators=[
+            RegexValidator(
+                regex=r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,30}$',
+                message='La contrasenya ha de tenir entre 8 i 30 caràcters i contenir almenys una majúscula, una minúscula i un número.'
+            )
+        ])
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password']
 
     def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            password=validated_data['password']
-        )
-        return user
+        return User.objects.create_user(**validated_data)
 
 
 class MovieSerializer(serializers.ModelSerializer):
