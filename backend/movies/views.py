@@ -1,8 +1,27 @@
 from django.shortcuts import render
 from rest_framework import generics
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from .models import Movie
-from .serializers import MovieSerializer
+from .serializers import UserLoginSerializer, MovieSerializer
 from django.db.models import Avg
+from rest_framework_simplejwt.tokens import RefreshToken
+
+
+class UserLoginAPIView(APIView):
+    """
+    API View para autenticar un usuario.
+    """
+    def post(self, request):
+        serializer = UserLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'refresh': str(refresh),
+            'access': str(refresh.access_token)
+        })
+
 
 class MovieListAPIView(generics.ListAPIView):
     """
