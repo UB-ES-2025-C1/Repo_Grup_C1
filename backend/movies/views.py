@@ -1,8 +1,18 @@
 from django.shortcuts import render
 from rest_framework import generics
+from django.contrib.auth.models import User
 from .models import Movie
-from .serializers import MovieSerializer
+from .serializers import UserRegisterSerializer, MovieSerializer
 from django.db.models import Avg
+
+
+class UserRegisterAPIView(generics.CreateAPIView):
+    """
+    This viewset automatically provides `list` and `retrieve` actions.
+    """
+    queryset = User.objects.all()
+    serializer_class = UserRegisterSerializer
+
 
 class MovieListAPIView(generics.ListAPIView):
     """
