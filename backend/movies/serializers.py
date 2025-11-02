@@ -48,8 +48,8 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         },
         validators=[
             RegexValidator(
-                regex=r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,30}$',
-                message='La contrasenya ha de tenir entre 8 i 30 caràcters i contenir almenys una majúscula, una minúscula i un número.'
+                regex=r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)',
+                message='La contrasenya ha de contenir almenys una majúscula, una minúscula i un número.'
             )
         ])
 
