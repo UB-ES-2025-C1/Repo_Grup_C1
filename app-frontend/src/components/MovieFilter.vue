@@ -65,7 +65,7 @@
 
     <!-- Buttons -->
     <div class="buttons">
-      <button class="apply">Apply Filters</button>
+      <button class="apply" @click="applyFilters">Apply Filters</button>
       <button class="clear" @click="resetFilters">Clear Filters</button>
     </div>
   </section>
@@ -74,11 +74,15 @@
 <script setup>
 import { ref } from 'vue'
 
-// Opciones de ejemplo (más adelante vendrán del backend)
-const genres = ['Action', 'Comedy', 'Drama', 'Thriller']
-const years = Array.from({ length: 20 }, (_, i) => 2024 - i)
+// Recibe los géneros y años reales desde HomeView
+const props = defineProps({
+  genres: { type: Array, default: () => [] },
+  years: { type: Array, default: () => [] }
+})
 
-// Estado de los filtros seleccionados
+// Emite los filtros seleccionados al padre
+const emit = defineEmits(['applyFilters'])
+
 const selected = ref({
   genre: '',
   year: '',
@@ -88,7 +92,10 @@ const selected = ref({
   order: 'desc'
 })
 
-// Reinicia todos los filtros
+function applyFilters() {
+  emit('applyFilters', { ...selected.value })
+}
+
 function resetFilters() {
   selected.value = {
     genre: '',
@@ -98,6 +105,7 @@ function resetFilters() {
     sortBy: 'rating',
     order: 'desc'
   }
+  emit('applyFilters', { ...selected.value })
 }
 </script>
 

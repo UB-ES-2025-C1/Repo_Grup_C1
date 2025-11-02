@@ -16,9 +16,13 @@
       />
     </div>
 
-    <!-- 🎬 Filtros (solo interfaz visual) -->
+    <!-- 🎬 Filtros -->
     <section class="filters-section">
-      <MovieFilter />
+      <MovieFilter
+        :genres="availableGenres"
+        :years="availableYears"
+        @applyFilters="applyFilters"
+      />
     </section>
 
     <!-- Mensajes de carga o error -->
@@ -63,8 +67,9 @@ const error = ref(null)
 const page = ref(1)
 const pageSize = ref(10)
 const searchQuery = ref('')
+const selectedFilters = ref({})
 
-// --- LÓGICA DE DATOS ---
+// --- CARGAR DATOS ---
 onMounted(async () => {
   try {
     const response = await axios.get('http://127.0.0.1:8000/movies/')
@@ -77,14 +82,88 @@ onMounted(async () => {
   }
 })
 
-// --- FILTRADO POR BÚSQUEDA ---
-const filteredMovies = computed(() => {
-  if (!searchQuery.value.trim()) return allMovies.value
-  const q = searchQuery.value.toLowerCase()
-  return allMovies.value.filter(m =>
-    m.primaryTitle.toLowerCase().includes(q)
-  )
+// --- GENERAR LISTAS DINÁMICAS ---
+const availableGenres = computed(() => {
+  const genres = new Set()
+  allMovies.value.forEach(movie => {
+    if (movie.genres && Array.isArray(movie.genres)) {
+      movie.genres.forEach(g => genres.add(g.trim()))
+    }
+  })
+  return Array.from(genres).sort()
 })
+
+const availableYears = computed(() => {
+  const years = allMovies.value
+    .map(m => parseInt(m.startYear))
+    .filter(y => !isNaN(y))
+  if (years.length === 0) return []
+  const min = Math.min(...years)
+  const max = Math.max(...years)
+  return Array.from({ length: max - min + 1 }, (_, i) => max - i)
+})
+
+// --- FILTRADO ---
+const filteredMovies = computed(() => {
+  let result = allMovies.value
+
+  // 🔹 Búsqueda
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter(m => m.primaryTitle.toLowerCase().includes(q))
+  }
+
+  // 🔹 Filtros
+  if (selectedFilters.value.genre) {
+    result = result.filter(m => m.genres?.includes(selectedFilters.value.genre))
+  }
+  if (selectedFilters.value.year) {
+    result = result.filter(m => m.startYear == selectedFilters.value.year)
+  }
+  if (selectedFilters.value.director) {
+    result = result.filter(m =>
+      m.director?.toLowerCase().includes(selectedFilters.value.director.toLowerCase())
+    )
+  }
+  if (selectedFilters.value.actor) {
+    result = result.filter(m =>
+      m.actors?.some(a =>
+        a.toLowerCase().includes(selectedFilters.value.actor.toLowerCase())
+      )
+    )
+  }
+
+  // 🔹 Ordenar
+  if (selectedFilters.value.sortBy === 'rating') {
+    result = [...result].sort((a, b) => {
+      const valA = a.average_rating || 0
+      const valB = b.average_rating || 0
+      return selectedFilters.value.order === 'asc' ? valA - valB : valB - valA
+    })
+  } else if (selectedFilters.value.sortBy === 'title') {
+    result = [...result].sort((a, b) => {
+      const tA = a.primaryTitle?.toLowerCase() || ''
+      const tB = b.primaryTitle?.toLowerCase() || ''
+      return selectedFilters.value.order === 'asc'
+        ? tA.localeCompare(tB)
+        : tB.localeCompare(tA)
+    })
+  } else if (selectedFilters.value.sortBy === 'popularity') {
+    result = [...result].sort((a, b) => {
+      const valA = a.numVotes || 0
+      const valB = b.numVotes || 0
+      return selectedFilters.value.order === 'asc' ? valA - valB : valB - valA
+    })
+  }
+
+  return result
+})
+
+// --- APLICAR FILTROS ---
+function applyFilters(filters) {
+  selectedFilters.value = filters
+  page.value = 1
+}
 
 // --- PAGINACIÓN ---
 const totalPages = computed(() =>
