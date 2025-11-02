@@ -20,53 +20,61 @@
         <button type="submit">Create account</button>
       </form>
 
-      <p v-if="success" style="color:green">{{ success }}</p>
-      <ul v-if="error.length" style="color:red; margin:0; padding-left:1rem">
-        <li v-for="(msg, i) in error" :key="i">{{ msg }}</li>
-      </ul>
+      <div v-if="loading" class="empty">Creating account...</div>
+      <div v-if="success" style="color:green">{{ success }}</div>
+      <div v-if="error.length">
+        <p style="color:red">Error creating your account</p>
+        <ul style="color:red; margin:0; padding-left:1rem">
+          <li v-for="(msg, i) in error" :key="i">{{ msg }}</li>
+        </ul>
+      </div>
     </section>
   </main>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref } from 'vue';
 import axios from 'axios';
 
 // --- ESTADO ---
-const username = ref('')
-const email = ref('')
-const password = ref('')
-const success = ref(null)
-const error = ref([])
+const username = ref('');
+const email = ref('');
+const password = ref('');
+const loading = ref(false);
+const success = ref(null);
+const error = ref([]);
 
 // --- MÉTODOS (Acciones del usuario) ---
 const register = async () => {
-  error.value = []
-  success.value = null
+  loading.value = true;
+  error.value = [];
+  success.value = null;
 
   try {
     const response = await axios.post('http://127.0.0.1:8000/movies/register/', {
       username: username.value,
       email: email.value,
       password: password.value
-    })
+    });
 
     // Si el backend devuelve 201 o similar, es correcto
-    success.value = 'Compte creat correctament! Redirigint...'
+    loading.value = false;
+    success.value = 'Compte creat correctament! Redirigint...';
 
     // TO DO: Se hace login o se lleva a la pagina de login (falta juntar login y registro)
 
   } catch (err) {
+    loading.value = false;
     if (err.response?.data) {
       // Mostrar los errores del backend
-      const data = err.response.data
+      const data = err.response.data;
       if (typeof data === 'object') {
-        error.value = Object.values(data).flat()
+        error.value = Object.values(data).flat();
       } else {
-        error.value = [data]
+        error.value = [data];
       }
     } else {
-      error.value = ['Error en crear el compte.']
+      error.value = ['Error en crear el compte.'];
     }
   }
 }
