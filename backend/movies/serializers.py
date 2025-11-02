@@ -11,7 +11,7 @@ class UserLoginSerializer(serializers.Serializer):
     def validate(self, data):
         user = authenticate(email=data['email'], password=data['password'])
         if not user:
-            raise serializers.ValidationError('Usuari o contrasenya incorrectes.')
+            raise serializers.ValidationError({'detail': 'Correu electrònic o contrasenya incorrectes.'})
         data['user'] = user
         return data
     
