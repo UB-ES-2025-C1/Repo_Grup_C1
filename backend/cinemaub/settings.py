@@ -85,6 +85,21 @@ DATABASES = {
 }
 
 
+# Allows for email authentication
+
+AUTHENTICATION_BACKENDS = [
+    'movies.authentication.EmailBackend',  # Email authentication
+    'django.contrib.auth.backends.ModelBackend',  # Fallback
+]
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

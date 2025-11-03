@@ -4,9 +4,13 @@
       <span class="dot"></span> CINEMA UB
     </a>
     <div class="actions">
+      <router-link to="/login"><button class="ghost">Log in</button></router-link>
+    </div>
+    <div class="actions">
       <router-link to="/register"><button>Sign up</button></router-link>
     </div>
   </header>
+
 
   <div class="container">
     <div v-if="loading" class="empty">Loading movies…</div>
