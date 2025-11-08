@@ -111,9 +111,10 @@ REST_FRAMEWORK = {
 # https://django-axes.readthedocs.io/en/latest/4_configuration.html
 
 AXES_ENABLED = True           # Activate django-axes
+AXES_FAILURE_LIMIT = 3        # Lockout after 3 failed login attemps
 AXES_COOLOFF_TIME = 30        # Lockout time in minutes
 AXES_RESET_ON_SUCCESS = True  # Reset counter after successful login
-AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]  # Lockout by IP + Email
+AXES_LOCKOUT_PARAMETERS = [['ip_address', 'username']]  # Lockout by IP + Email
 
 
 # Password validation
