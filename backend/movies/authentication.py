@@ -9,8 +9,8 @@ class EmailBackend(ModelBackend):
     """
     Permite autenticar con email y contraseña en vez de username.
     """
-    def authenticate(self, request, username=None, password=None, email=None, **kwargs):
-        email = email or username
+    def authenticate(self, request, username=None, password=None, **kwargs):
+        email = kwargs.get('email') or username
         if email is None or password is None:
             return None
         try:

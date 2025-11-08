@@ -108,7 +108,7 @@ REST_FRAMEWORK = {
 AXES_ENABLED = True           # Activate django-axes
 AXES_COOLOFF_TIME = 30        # Lockout time in minutes
 AXES_RESET_ON_SUCCESS = True  # Reset counter after successful login
-AXES_LOCKOUT_PARAMETERS = ["ip_address", "email"]  # Lockout by IP + Email
+AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]  # Lockout by IP + Email
 
 
 # Password validation

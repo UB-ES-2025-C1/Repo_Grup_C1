@@ -12,8 +12,7 @@ class UserLoginSerializer(serializers.Serializer):
     def validate(self, data):
         request = self.context.get('request')
         try:
-            user = authenticate(request=request, username=data['email'], 
-                                email=data['email'], password=data['password'])
+            user = authenticate(request=request, username=data['email'], password=data['password'])
         except PermissionDenied:
             # Este bloque se ejecuta si Axes bloqueó el acceso por número de intentos de login superado
             raise serializers.ValidationError("Has superat el nombre màxim d'intents. Torna-ho a provar en 30 minuts.")
