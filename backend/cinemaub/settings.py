@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'movies',
     'rest_framework',
+    'axes'
 ]
 
 MIDDLEWARE = [
@@ -52,6 +53,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware'
 ]
 
 ROOT_URLCONF = 'cinemaub.urls'
@@ -88,6 +90,7 @@ DATABASES = {
 # Allows for email authentication
 
 AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',  # !Needs to be first! Login lockout after failed attemps, 
     'movies.authentication.EmailBackend',  # Email authentication
     'django.contrib.auth.backends.ModelBackend',  # Fallback
 ]
@@ -98,6 +101,14 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+
+# Configuration of django-axes
+# https://django-axes.readthedocs.io/en/latest/4_configuration.html
+
+AXES_ENABLED = True           # Activate django-axes
+AXES_COOLOFF_TIME = 30        # Lockout time in minutes
+AXES_RESET_ON_SUCCESS = True  # Reset counter after successful login
+AXES_LOCKOUT_PARAMETERS = ["ip_address", "email"]  # Lockout by IP + Email
 
 
 # Password validation
