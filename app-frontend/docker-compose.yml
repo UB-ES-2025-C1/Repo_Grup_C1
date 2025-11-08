@@ -14,7 +14,9 @@ services:
     expose:
       - "80"
     networks:
-      - web
+      web:
+        aliases:
+          - cinemaub-frontend
     restart: unless-stopped
 
 networks:

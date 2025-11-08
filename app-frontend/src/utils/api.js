@@ -9,8 +9,8 @@ const buildBaseUrl = (host) => {
     return normalized;
   }
 
-  if (normalized.includes(':')) {
-    return `http://${normalized}`;
+  if (normalized === 'cinemaub.llurbatech.com') {
+    return `https://${normalized}`;
   }
 
   return `http://${normalized}:${DEFAULT_PORT}`;

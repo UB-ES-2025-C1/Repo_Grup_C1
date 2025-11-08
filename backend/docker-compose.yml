@@ -14,7 +14,9 @@ services:
     expose:
       - "8000"
     networks:
-      - web
+      web:
+        aliases:
+          - cinemaub-backend
     restart: unless-stopped
 
 networks:
