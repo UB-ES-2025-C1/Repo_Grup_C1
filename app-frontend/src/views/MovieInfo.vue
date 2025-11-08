@@ -27,6 +27,25 @@
           <li>⭐ Rating: <strong>{{ movie.average_rating }}</strong></li>
           <li>👥 Votes: <strong>{{ movie.numVotes.toLocaleString() }}</strong></li>
         </ul>
+        <!-- Preview the user's existing rating if available -->
+        <div v-if="hasUserRating && ratingPreview" class="user-rating-preview">
+          <h3>Your rating</h3>
+          <div class="preview-row">
+            <p class="overall">Overall: {{ ratingPreview.overall_score }}</p>
+            <div class="mini-stats">
+              <span>Soundtrack: {{ ratingPreview.soundtrack }}</span>
+              <span>Acting: {{ ratingPreview.acting }}</span>
+              <span>Cinematography: {{ ratingPreview.cinematography }}</span>
+              <span>Plot: {{ ratingPreview.plot }}</span>
+            </div>
+          </div>
+          <p v-if="ratingPreview.comment" class="comment">"{{ ratingPreview.comment }}"</p>
+        </div>
+        <div class="actions" style="margin-top:1rem">
+          <router-link :to="{ name: 'movie-rate', params: { tconst: movie.tconst } }">
+            <button>{{ hasUserRating ? 'Change Rating' : 'Rate' }}</button>
+          </router-link>
+        </div>
       </div>
     </div>
   </div>
@@ -50,6 +69,8 @@ const props = defineProps({
 const movie = ref(null);
 const loading = ref(true);
 const error = ref(null);
+const hasUserRating = ref(false);
+const ratingPreview = ref(null);
 
 // 3. Cuando el componente se monta, llamamos a la API
 onMounted(async () => {
@@ -57,6 +78,27 @@ onMounted(async () => {
     // Usamos el 'tconst' de las props para construir la URL de la API
     const response = await axios.get(`http://127.0.0.1:8000/movies/${props.tconst}/`);
     movie.value = response.data;
+    // Check if authenticated user already has a rating for this movie
+    try {
+      const token = localStorage.getItem('access');
+      if (token) {
+        const ratingResp = await axios.get(`http://127.0.0.1:8000/movies/ratings/${props.tconst}/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        // store preview data
+        ratingPreview.value = ratingResp.data;
+        hasUserRating.value = true;
+      } else {
+        hasUserRating.value = false;
+      }
+      } catch (ratingErr) {
+      if (ratingErr.response && ratingErr.response.status === 404) {
+        hasUserRating.value = false;
+      } else {
+        // other errors (401 etc.) -> treat as not rated, do not redirect
+        hasUserRating.value = false;
+      }
+    }
   } catch (err) {
     console.error(err);
     error.value = 'Could not fetch movie details.';
@@ -102,4 +144,17 @@ onMounted(async () => {
   gap: 1.5rem;
   font-size: 1.1rem;
 }
+
+.user-rating-preview {
+  margin-top: 3rem;
+  padding: .75rem;
+  background: var(--card);
+  border-radius: 8px;
+}
+.user-rating-preview h3 { margin: 0 0 1rem; }
+.preview-row { display:flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
+.overall { margin:0; font-weight:600; }
+.mini-stats { display:flex; gap: .7rem; flex-wrap:wrap; color: var(--muted); }
+.mini-stats span { background: transparent; padding: .15rem 0rem; border-radius: 6px; font-size: .95rem }
+.user-rating-preview .comment { margin-top:1rem; color: var(--text); font-style: italic }
 </style>
