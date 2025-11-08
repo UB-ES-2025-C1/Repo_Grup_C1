@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  cinemaub-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    env_file:
+      - .env
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    expose:
+      - "80"
+    networks:
+      web:
+        aliases:
+          - cinemaub-frontend
+    restart: unless-stopped
+
+networks:
+  web:
+    external: true

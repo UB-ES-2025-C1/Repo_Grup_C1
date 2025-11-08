@@ -59,14 +59,13 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { getApiBaseUrl, withApiBase } from '@/utils/api';
 
 const props = defineProps({
   tconst: { type: String, required: true }
 });
 const tconst = props.tconst;
 const router = useRouter();
-
-const API_BASE = 'http://127.0.0.1:8000';
 
 const loading = ref(true);
 const error = ref(null);
@@ -95,7 +94,7 @@ onMounted(async () => {
 
   try {
     // Fetch movie basic info
-    const movieResp = await axios.get(`${API_BASE}/movies/${tconst}/`);
+    const movieResp = await axios.get(withApiBase(`/movies/${tconst}/`));
     movieTitle.value = movieResp.data.primaryTitle || movieResp.data.title;
 
     // Try to fetch user's rating for this movie
@@ -106,7 +105,7 @@ onMounted(async () => {
       return;
     }
 
-    const resp = await axios.get(`${API_BASE}/movies/ratings/${tconst}/`, {
+    const resp = await axios.get(withApiBase(`/movies/ratings/${tconst}/`), {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -157,7 +156,7 @@ async function submitRating() {
 
   try {
     // Try to create or update via POST to ratings/ which in backend updates existing
-    const resp = await axios.post(`${API_BASE}/movies/ratings/`, payload, {
+    const resp = await axios.post(withApiBase(`/movies/ratings/`), payload, {
       headers: { Authorization: `Bearer ${token}` }
     });
 

@@ -54,8 +54,9 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { getApiBaseUrl, withApiBase } from '@/utils/api';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = getApiBaseUrl();
 
 // 1. Recibimos 'tconst' como una prop gracias a `props: true` en el router
 const props = defineProps({
@@ -76,13 +77,13 @@ const ratingPreview = ref(null);
 onMounted(async () => {
   try {
     // Usamos el 'tconst' de las props para construir la URL de la API
-    const response = await axios.get(`http://127.0.0.1:8000/movies/${props.tconst}/`);
+    const response = await axios.get(withApiBase(`/movies/${props.tconst}/`));
     movie.value = response.data;
     // Check if authenticated user already has a rating for this movie
     try {
       const token = localStorage.getItem('access');
       if (token) {
-        const ratingResp = await axios.get(`http://127.0.0.1:8000/movies/ratings/${props.tconst}/`, {
+        const ratingResp = await axios.get(withApiBase(`/movies/ratings/${props.tconst}/`), {
           headers: { Authorization: `Bearer ${token}` }
         });
         // store preview data
