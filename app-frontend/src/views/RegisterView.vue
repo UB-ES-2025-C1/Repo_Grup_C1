@@ -35,6 +35,7 @@
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
+import { withApiBase } from '@/utils/api';
 
 // --- ESTADO ---
 const username = ref('');
@@ -51,7 +52,7 @@ const register = async () => {
   success.value = null;
 
   try {
-    const response = await axios.post('http://127.0.0.1:8000/movies/register/', {
+    const response = await axios.post(withApiBase('/movies/register/'), {
       username: username.value,
       email: email.value,
       password: password.value
