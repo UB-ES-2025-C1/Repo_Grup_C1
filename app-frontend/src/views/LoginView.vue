@@ -6,7 +6,7 @@
   <main class="container auth">
     <section class="authCard">
       <h1 style="margin:0 0 .5rem">Log in</h1>
-      <p style="color:#94a3b8; margin:0 0 1rem">Placeholder page</p>
+      <p style="color:#94a3b8; margin:0 0 1rem">Welcome back! Please log in to your account.</p>
 
       <form @submit.prevent="login" style="display:grid;gap:.75rem">
         <input class="input" v-model="email" type="email" placeholder="Email" required>
