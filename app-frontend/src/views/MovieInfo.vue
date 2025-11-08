@@ -83,7 +83,7 @@ onMounted(async () => {
     try {
       const token = localStorage.getItem('access');
       if (token) {
-        const ratingResp = await axios.get(`http://127.0.0.1:8000/movies/ratings/${props.tconst}/`, {
+        const ratingResp = await axios.get(withApiBase(`/movies/ratings/${props.tconst}/`), {
           headers: { Authorization: `Bearer ${token}` }
         });
         // store preview data
