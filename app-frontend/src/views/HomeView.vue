@@ -64,6 +64,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
+import { withApiBase } from '@/utils/api'
 import MovieCard from '@/components/MovieCard.vue'
 import MovieFilter from '@/components/MovieFilter.vue'
 
@@ -79,7 +80,7 @@ const selectedFilters = ref({})
 // --- CARGAR DATOS ---
 onMounted(async () => {
   try {
-    const response = await axios.get('http://127.0.0.1:8000/movies/')
+    const response = await axios.get(withApiBase('/movies/'))
     allMovies.value = response.data
   } catch (err) {
     console.error(err)

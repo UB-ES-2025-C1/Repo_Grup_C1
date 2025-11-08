@@ -24,6 +24,7 @@
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
+import { withApiBase } from '@/utils/api';
 import { useRouter } from 'vue-router'
 
 // --- ESTADO ---
@@ -39,7 +40,7 @@ const login = async () => {
   error.value = null;
 
   try {
-    const response = await axios.post('http://127.0.0.1:8000/movies/login/', {
+    const response = await axios.post(withApiBase('/movies/login/'), {
       email: email.value,
       password: password.value
     });
