@@ -13,7 +13,7 @@ class UserLoginAPIView(APIView):
     API View para autenticar un usuario.
     """
     def post(self, request):
-        serializer = UserLoginSerializer(data=request.data)
+        serializer = UserLoginSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         refresh = RefreshToken.for_user(user)

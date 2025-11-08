@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Movie
 from django.db.models import Avg
 from django.contrib.auth import authenticate
-from django.core.exceptions import PermissionDenied
+from axes.handlers.database import AxesDatabaseHandler
 
 
 class UserLoginSerializer(serializers.Serializer):
@@ -10,14 +10,22 @@ class UserLoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
+        email = data['email']
+        password = data['password']
         request = self.context.get('request')
-        try:
-            user = authenticate(request=request, username=data['email'], password=data['password'])
-        except PermissionDenied:
-            # Este bloque se ejecuta si Axes bloqueó el acceso por número de intentos de login superado
-            raise serializers.ValidationError("Has superat el nombre màxim d'intents. Torna-ho a provar en 30 minuts.")
+        axes_handler = AxesDatabaseHandler()
+
+        user = authenticate(request=request, username=email, password=password)
+
+        # Auteticación bloqueada por numero de intentos fallidos alcanzado
+        if axes_handler.is_locked(request, credentials={'username': email}):
+            raise serializers.ValidationError({'detail': 
+                                               "Has superat el nombre màxim d'intents. Torna-ho a provar en 30 minuts."})
+
+        # Autenticación fallida por credenciales incorrectas
         if not user:
             raise serializers.ValidationError({'detail': 'Correu electrònic o contrasenya incorrectes.'})
+        
         data['user'] = user
         return data
     
