@@ -12,6 +12,13 @@ const routes = [
     component: MovieInfo,
     props: true
   },
+  {
+    path: '/movie/:tconst/rate',
+    name: 'movie-rate',
+    // lazy-load the component
+    component: () => import('@/views/RateMovie.vue'),
+    props: true
+  },
   { path: '/register', name: 'register', component: RegisterView } ,
   { path: '/login', name: 'login', component: LoginView } 
 ]

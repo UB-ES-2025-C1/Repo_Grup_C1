@@ -5,6 +5,8 @@ from django.contrib.auth.models import User
 from .models import Movie
 from django.db.models import Avg
 from django.contrib.auth import authenticate
+from .models import Rating
+from rest_framework.exceptions import ValidationError
     
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -125,7 +127,7 @@ class MovieSerializer(serializers.ModelSerializer):
                 pass
 
         # Último recurso: calcular la media local desde ratings relacionados.
-        avg_local = obj.ratings.aggregate(Avg('score')).get('score__avg')
+        avg_local = obj.ratings.aggregate(Avg('overall_score')).get('overall_score__avg')
         return round(avg_local, 1) if avg_local is not None else 0
 
     def _split_field(self, value):
@@ -157,3 +159,64 @@ class MovieSerializer(serializers.ModelSerializer):
         if count is not None:
             return count
         return 0 if obj.ratings.count() == 0 else obj.ratings.count()
+
+
+class RatingSerializer(serializers.ModelSerializer):
+    # Accept movie tconst in input (write-only). We look up the Movie in create().
+    movie = serializers.CharField(write_only=True)
+    # Expose movie.tconst on reads
+    movie_tconst = serializers.CharField(source='movie.tconst', read_only=True)
+
+    class Meta:
+        model = Rating
+        fields = [
+            'id',
+            'movie',
+            'movie_tconst',
+            'overall_score',
+            'soundtrack',
+            'acting',
+            'cinematography',
+            'plot',
+            'comment',
+        ]
+
+    def validate_overall_score(self, value):
+        if value < 0 or value > 10:
+            raise ValidationError('overall_score must be between 0 and 10')
+        return value
+
+    def validate(self, data):
+        # Ensure movie exists by tconst
+        tconst = data.get('movie')
+        try:
+            movie = Movie.objects.get(tconst=tconst)
+        except Movie.DoesNotExist:
+            raise ValidationError({'movie': 'Movie with provided tconst does not exist.'})
+        data['movie_obj'] = movie
+        return data
+
+    def create(self, validated_data):
+        # movie_obj populated in validate()
+        movie = validated_data.pop('movie_obj')
+        # remove raw 'movie' key (tconst string) if present to avoid passing it to model create
+        validated_data.pop('movie', None)
+        # request user
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user is None or not user.is_authenticated:
+            raise ValidationError({'detail': 'Authentication required.'})
+
+        # Prevent duplicate rating by same user for same movie
+        existing = Rating.objects.filter(movie=movie, user=user).first()
+        if existing:
+            # Update only known fields on existing rating instead of creating a duplicate
+            updatable = ['overall_score', 'soundtrack', 'acting', 'cinematography', 'plot', 'comment']
+            for attr in updatable:
+                if attr in validated_data:
+                    setattr(existing, attr, validated_data[attr])
+            existing.save()
+            return existing
+
+        rating = Rating.objects.create(movie=movie, user=user, **validated_data)
+        return rating
