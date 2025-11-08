@@ -199,6 +199,8 @@ class RatingSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # movie_obj populated in validate()
         movie = validated_data.pop('movie_obj')
+        # remove raw 'movie' key (tconst string) if present to avoid passing it to model create
+        validated_data.pop('movie', None)
         # request user
         request = self.context.get('request')
         user = getattr(request, 'user', None)
@@ -208,9 +210,11 @@ class RatingSerializer(serializers.ModelSerializer):
         # Prevent duplicate rating by same user for same movie
         existing = Rating.objects.filter(movie=movie, user=user).first()
         if existing:
-            # Update existing rating instead of creating a duplicate
-            for attr, val in validated_data.items():
-                setattr(existing, attr, val)
+            # Update only known fields on existing rating instead of creating a duplicate
+            updatable = ['overall_score', 'soundtrack', 'acting', 'cinematography', 'plot', 'comment']
+            for attr in updatable:
+                if attr in validated_data:
+                    setattr(existing, attr, validated_data[attr])
             existing.save()
             return existing
 
