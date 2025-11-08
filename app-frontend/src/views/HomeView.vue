@@ -75,7 +75,10 @@ const error = ref(null)
 const page = ref(1)
 const pageSize = ref(10)
 const searchQuery = ref('')
-const selectedFilters = ref({})
+const selectedFilters = ref({
+  sortBy: 'rating',
+  order: 'desc'
+})
 
 // --- CARGAR DATOS ---
 onMounted(async () => {
