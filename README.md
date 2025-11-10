@@ -41,7 +41,6 @@ cd app-frontend
 ### Dependencias del frontend
 ```
 npm install
-npm install axios
 ```
 
 ### Inicia el frontend
