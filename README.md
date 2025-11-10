@@ -48,3 +48,20 @@ npm install axios
 ```
 npm run dev
 ```
+
+### Frontend Testing Setup
+
+El proyecto incluye soporte de tests unitarios con Vitest y Vue Test Utils.
+
+    package.json: contiene las dependencias necesarias para testing (vitest, @vue/test-utils, jsdom, @vitest/ui) y los scripts para ejecutarlos.
+
+    vitest.config.js: configura el entorno de pruebas, indicando que se use jsdom (simula un navegador) y el plugin oficial de Vue.
+
+
+Ejecutar los tests
+
+```
+cd app-frontend
+npm install
+npm test
+```
