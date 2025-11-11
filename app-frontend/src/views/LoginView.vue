@@ -51,6 +51,26 @@ const login = async () => {
     localStorage.setItem('access', data.access);
     localStorage.setItem('refresh', data.refresh);
 
+    // Recuperar la última ruta guardada
+    let redirect = null
+    try {
+      redirect = sessionStorage.getItem('lastPath')
+    } catch (e) {
+      redirect = null
+    }
+
+    // Validaciones de seguridad: debe ser ruta interna y no ser /login o /register
+    if (redirect && typeof redirect === 'string') {
+      // sólo permitir rutas internas que empiecen por '/'
+      const forbidden = ['/login', '/register']
+      if (redirect.startsWith('/') && !forbidden.includes(redirect)) {
+        // limpiar y redirigir
+        sessionStorage.removeItem('lastPath')
+        router.push(redirect)
+        return
+      }
+    }
+
     // Volver a la pagina de inicio
     router.push('/');
   } catch (err) {
