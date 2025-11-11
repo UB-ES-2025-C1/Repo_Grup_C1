@@ -169,6 +169,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",      # Si tu Vue app corre en localhost:5173
     "http://127.0.0.1:5173",      # Otra posible dirección local
     "https://cinemaub.llurbatech.com",
+    "https://cinemaub-beta.llurbatech.com",
 ]
 
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", 'http://localhost:5173,http://127.0.0.1:5173,https://cinemaub.llurbatech.com').split(',')
