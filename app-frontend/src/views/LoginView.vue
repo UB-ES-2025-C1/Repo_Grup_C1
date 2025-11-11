@@ -25,6 +25,13 @@
           <input class="input" v-model="password" type="password" placeholder="Password" required>
           <button type="submit">Log in</button>
         </form>
+
+        <p style="color:#94a3b8; margin-top:1rem; text-align:center">
+          Do you not have an account yet?
+          <router-link to="/register" style="color:#3b82f6; text-decoration:none; font-weight:500;">
+            Sign up
+          </router-link>
+        </p>
       </div>
 
       <div v-if="loading" class="empty">Logging in...</div>

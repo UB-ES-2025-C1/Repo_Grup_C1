@@ -14,6 +14,7 @@
         Create your account to enjoy CINEMA&nbsp;UB.
       </p>
 
+      
       <form @submit.prevent="register" style="display:grid;gap:.75rem">
         <input class="input" v-model="username" type="text" placeholder="Name" required>
         <input class="input" v-model="email" type="email" placeholder="Email" required>
@@ -98,4 +99,5 @@ const register = async () => {
     }
   }
 }
+
 </script>
