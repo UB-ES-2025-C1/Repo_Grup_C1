@@ -1,15 +1,5 @@
 <template>
-  <header class="header">
-    <a href="/" class="brand">
-      <span class="dot"></span> CINEMA UB
-    </a>
-    <div class="actions">
-      <router-link to="/login"><button class="ghost">Log in</button></router-link>
-    </div>
-    <div class="actions">
-      <router-link to="/register"><button>Sign up</button></router-link>
-    </div>
-  </header>
+  <AppHeader />
 
 
   <div class="container">
@@ -62,6 +52,7 @@
 </template>
 
 <script setup>
+import AppHeader from '@/components/AppHeader.vue'
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { withApiBase } from '@/utils/api'

@@ -1,10 +1,11 @@
 <template>
-  <header class="header">
-    <div class="brand"><span class="dot"></span> CINEMA UB</div>
-    <div class="actions">
-      <router-link to="/"><button class="ghost">← Home</button></router-link>
-    </div>
-  </header>
+  <AppHeader>
+    <template #actions>
+      <div class="actions">
+        <router-link to="/"><button class="ghost">← Home</button></router-link>
+      </div>
+    </template>
+  </AppHeader>
 
   <main class="container auth">
     <section class="authCard">
@@ -21,7 +22,7 @@
         <button type="submit">Create account</button>
       </form>
 
-      <p style="color:#94a3b8; margin:0 0 1rem; text-align:center">
+      <p style="color:#94a3b8; margin-top:1rem; text-align:center">
         Already have an account?
         <router-link to="/login" style="color:#3b82f6; text-decoration:none; font-weight:500;">
           Log in
@@ -42,6 +43,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import AppHeader from '@/components/AppHeader.vue'
 import axios from 'axios';
 import { withApiBase } from '@/utils/api';
 
@@ -79,7 +81,8 @@ const register = async () => {
     success.value = 'Compte creat correctament! Redirigint...';
 
     // TO DO: Se hace login o se lleva a la pagina de login (falta juntar login y registro)
-
+    // Volver a la pagina de inicio
+    window.location.href = '/login';
   } catch (err) {
     loading.value = false;
     if (err.response?.data) {

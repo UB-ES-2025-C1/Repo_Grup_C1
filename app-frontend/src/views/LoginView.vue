@@ -1,8 +1,9 @@
 <template>
-  <header class="header">
-    <div class="brand"><span class="dot"></span> CINEMA UB</div>
-    <div class="actions"><router-link to="/"><button class="ghost">← Home</button></router-link></div>
-  </header>
+  <AppHeader>
+    <template #actions>
+      <div class="actions"><router-link to="/"><button class="ghost">← Home</button></router-link></div>
+    </template>
+  </AppHeader>
   <main class="container auth">
     <section class="authCard">
       <h1 style="margin:0 0 .5rem">Log in</h1>
@@ -35,6 +36,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import AppHeader from '@/components/AppHeader.vue'
 import axios from 'axios';
 import { withApiBase } from '@/utils/api';
 import { useRouter } from 'vue-router'
