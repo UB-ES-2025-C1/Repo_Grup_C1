@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from typing import List
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,7 +27,11 @@ SECRET_KEY = 'django-insecure-m*-h(1%zag%9daw=(=1ggz*p%g%60dj=b!v^7@9gxag*ib5v*&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'cinemaub.llurbatech.com',
+]
 
 
 # Application definition
@@ -41,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'movies',
     'rest_framework',
+    'axes'
 ]
 
 MIDDLEWARE = [
@@ -52,6 +58,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware'
 ]
 
 ROOT_URLCONF = 'cinemaub.urls'
@@ -83,6 +90,31 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+
+# Allows for email authentication
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',  # !Needs to be first! Login lockout after failed attemps, 
+    'movies.authentication.EmailBackend',  # Email authentication
+    'django.contrib.auth.backends.ModelBackend',  # Fallback
+]
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+# Configuration of django-axes
+# https://django-axes.readthedocs.io/en/latest/4_configuration.html
+
+AXES_ENABLED = True           # Activate django-axes
+AXES_FAILURE_LIMIT = 3        # Lockout after 3 failed login attemps
+AXES_COOLOFF_TIME = 30        # Lockout time in minutes
+AXES_RESET_ON_SUCCESS = True  # Reset counter after successful login
+AXES_LOCKOUT_PARAMETERS = [['ip_address', 'username']]  # Lockout by IP + Email
 
 
 # Password validation
@@ -136,4 +168,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",      # Si tu Vue app corre en localhost:5173
     "http://127.0.0.1:5173",      # Otra posible dirección local
+    "https://cinemaub.llurbatech.com",
+]
+
+CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", 'http://localhost:5173,http://127.0.0.1:5173,https://cinemaub.llurbatech.com').split(',')
+
+# Permitir credenciales en peticiones CORS
+CORS_ALLOW_CREDENTIALS = True
+
+# Headers permitidos
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]

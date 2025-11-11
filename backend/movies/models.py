@@ -3,6 +3,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import Avg
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class Movie(models.Model):
@@ -16,6 +17,14 @@ class Movie(models.Model):
     primary_title = models.CharField(max_length=200, null=True, blank=True)
 
     director = models.CharField(max_length=100, null=True, blank=True)
+    # Géneros (lista separada por comas). Se deja como CharField simple
+    # por ahora; si se necesita búsquedas/relaciones más ricas se puede
+    # reemplazar por un modelo ManyToMany (Genre) más adelante.
+    genres = models.CharField(max_length=300, null=True, blank=True)
+
+    # Actores principales / reparto. Almacenado como cadena separada por
+    # comas para evitar introducir nuevas tablas por el momento.
+    actors = models.CharField(max_length=1000, null=True, blank=True)
 
     # Year as string to allow unknown/partial values
     start_year = models.CharField(max_length=10, null=True, blank=True)
@@ -29,9 +38,6 @@ class Movie(models.Model):
 
     # Optional local image field (kept for backwards compatibility)
     image = models.ImageField(upload_to='movie_images/', null=True, blank=True)
-
-    # Cached number of votes (optional). If 0, we can compute it from ratings.
-    num_votes = models.IntegerField(default=0)
 
     # Rating from IMDb
     imdb_rating = models.FloatField(default=0.0)
@@ -49,7 +55,7 @@ class Movie(models.Model):
             combined = (imdb_rating * 0.5) + (avg_local * 0.5)
         """
         # local average and count
-        agg = self.ratings.aggregate(avg_score=Avg('score'))
+        agg = self.ratings.aggregate(avg_score=Avg('overall_score'))
         avg_local = agg.get('avg_score')
         imdb = getattr(self, 'imdb_rating', None) or 0.0
 
@@ -66,19 +72,52 @@ class Movie(models.Model):
 
     @property
     def numVotes(self):
-        """Return cached num_votes if present, otherwise count related ratings."""
-        try:
-            if self.num_votes:
-                return self.num_votes
-        except Exception:
-            pass
+        """Return the count of local ratings for this movie."""
         return self.ratings.count()
+
+    @property
+    def average_soundtrack(self):
+        """Average soundtrack score (0-10) from related Rating objects."""
+        agg = self.ratings.aggregate(avg_soundtrack=Avg('soundtrack'))
+        val = agg.get('avg_soundtrack')
+        return round(val, 1) if val is not None else 0
+
+    @property
+    def average_acting(self):
+        """Average acting score (0-10) from related Rating objects."""
+        agg = self.ratings.aggregate(avg_acting=Avg('acting'))
+        val = agg.get('avg_acting')
+        return round(val, 1) if val is not None else 0
+
+    @property
+    def average_cinematography(self):
+        """Average cinematography score (0-10) from related Rating objects."""
+        agg = self.ratings.aggregate(avg_cinematography=Avg('cinematography'))
+        val = agg.get('avg_cinematography')
+        return round(val, 1) if val is not None else 0
+
+    @property
+    def average_plot(self):
+        """Average plot score (0-10) from related Rating objects."""
+        agg = self.ratings.aggregate(avg_plot=Avg('plot'))
+        val = agg.get('avg_plot')
+        return round(val, 1) if val is not None else 0
 
 
 class Rating(models.Model):
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='ratings')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    score = models.IntegerField()
+    # Valoración general (0-10)
+    overall_score = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
+
+    # Valoraciones por apartados (0-10)
+    soundtrack = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
+    acting = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
+    cinematography = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
+    plot = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
+
+    # Comentario del usuario
+    comment = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f'{self.movie} - {self.user.username}: {self.score}'
+        return f'{self.movie} - {self.user.username}: {self.overall_score}'

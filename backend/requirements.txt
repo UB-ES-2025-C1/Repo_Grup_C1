@@ -1,4 +1,6 @@
 django==5.2
 djangorestframework
+djangorestframework-simplejwt
 Pillow
 django-cors-headers
+django-axes
