@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   backend:
     container_name: ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-backend
@@ -16,8 +14,8 @@ services:
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
     volumes:
-      - ./media:/app/media
-      - ./db.sqlite3:/app/db.sqlite3
+      - .backend/media:/app/media
+      - .backend/db.sqlite3:/app/db.sqlite3
     expose:
       - "8000"
     networks:

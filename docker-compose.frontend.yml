@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   frontend:
     container_name: ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-frontend
