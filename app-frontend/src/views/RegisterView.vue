@@ -17,8 +17,16 @@
         <input class="input" v-model="username" type="text" placeholder="Name" required>
         <input class="input" v-model="email" type="email" placeholder="Email" required>
         <input class="input" v-model="password" type="password" placeholder="Password" required>
+        <input class="input" v-model="confirmPassword" type="password" placeholder="Confirm Password" required>
         <button type="submit">Create account</button>
       </form>
+
+      <p style="color:#94a3b8; margin:0 0 1rem; text-align:center">
+        Already have an account?
+        <router-link to="/login" style="color:#3b82f6; text-decoration:none; font-weight:500;">
+          Log in
+        </router-link>
+      </p>
 
       <div v-if="loading" class="empty">Creating account...</div>
       <div v-if="success" style="color:green">{{ success }}</div>
@@ -40,15 +48,23 @@ import axios from 'axios';
 const username = ref('');
 const email = ref('');
 const password = ref('');
+const confirmPassword = ref('');
 const loading = ref(false);
 const success = ref(null);
 const error = ref([]);
 
 // --- MÉTODOS (Acciones del usuario) ---
 const register = async () => {
-  loading.value = true;
   error.value = [];
   success.value = null;
+
+  // Validar contraseñas
+  if (password.value !== confirmPassword.value) {
+    error.value = ['Les contrasenyes no coincideixen.'];
+    return;
+  }
+
+  loading.value = true;
 
   try {
     const response = await axios.post('http://127.0.0.1:8000/movies/register/', {
