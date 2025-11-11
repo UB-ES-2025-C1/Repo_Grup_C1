@@ -16,8 +16,7 @@
           <button type="submit" style="background-color:#f1807e">Log out</button>
         </form>
       </div>
-
-      <div v-if="!isLoggedIn">
+      <div v-else>
         <p style="color:#94a3b8; margin:0 0 1rem">Welcome back! Please log in to your account.</p>
 
         <form @submit.prevent="login" style="display:grid;gap:.75rem">
