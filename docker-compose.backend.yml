@@ -4,7 +4,7 @@ services:
   backend:
     container_name: ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-backend
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     env_file:
       - .env
