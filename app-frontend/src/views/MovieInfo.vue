@@ -1,10 +1,5 @@
 <template>
-  <!-- Usamos el header que ya tienes definido -->
-  <header class="header">
-    <router-link to="/" class="brand">
-      <span class="dot"></span> CINEMA UB
-    </router-link>
-  </header>
+  <AppHeader />
 
   <div class="container">
     <!-- Estado de carga -->
@@ -53,6 +48,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import AppHeader from '@/components/AppHeader.vue'
 import axios from 'axios';
 import { getApiBaseUrl, withApiBase } from '@/utils/api';
 

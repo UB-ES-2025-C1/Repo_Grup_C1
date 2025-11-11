@@ -40,6 +40,16 @@ Usa el siguiente usuario admin:
 - Usuario: admin  
 - Contraseña: password
 
+### Backend Testing Setup
+
+Ejecutar los tests
+
+```
+# si aún no lo has hecho:
+# cd backend
+python manage.py test -v 2
+```
+
 ## Terminal del frontend
 
 ### Navega al directorio del frontend
@@ -69,7 +79,8 @@ El proyecto incluye soporte de tests unitarios con Vitest y Vue Test Utils.
 Ejecutar los tests
 
 ```
-cd app-frontend
+# si aún no lo has hecho:
+# cd app-frontend
 npm install
 npm test
 ```
