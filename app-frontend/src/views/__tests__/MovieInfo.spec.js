@@ -138,7 +138,7 @@ describe('MovieInfo', () => {
     expect(text).toContain('Rating:')
     expect(text).toContain('8.5')
     // numVotes.toLocaleString() -> depende del locale, pero debería incluir "1,234" o "1234"
-    expect(text.replace('.', '').replace(',', '')).toContain('1234')
+    expect(text.replace(/[.,]/g, '')).toContain('1234')
 
     // Póster con base URL
     const img = wrapper.get('img')
