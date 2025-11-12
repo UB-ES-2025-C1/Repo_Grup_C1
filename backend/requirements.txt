@@ -4,3 +4,5 @@ djangorestframework-simplejwt
 Pillow
 django-cors-headers
 django-axes
+coverage==7.5.1 # Añadido para la cobertura de código
+django-coverage-plugin==3.1.0 # Añadido para la cobertura de código en Django

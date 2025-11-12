@@ -8,3 +8,6 @@ __pycache__/
 
 # Env variables
 *.env
+
+backend/htmlcov/
+backend/venv-locust/
