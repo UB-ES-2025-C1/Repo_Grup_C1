@@ -5,7 +5,7 @@
     <!-- Usamos v-if para mostrar un póster solo si la ruta existe -->
     <img
       v-if="movie.poster_path"
-      :src="API_BASE_URL + movie.poster_path" 
+      :src="getImageUrl(movie.poster_path)" 
       :alt="`Poster of ${movie.primaryTitle}`"
       loading="lazy"
     />
@@ -22,18 +22,20 @@
 </template>
 
 <script setup>
-import { getApiBaseUrl } from '@/utils/api';
-
-// La URL base de tu backend
-const API_BASE_URL = getApiBaseUrl();
+import { withApiBase } from '@/utils/api';
 
 // El componente recibe el objeto 'movie'
-defineProps({
+const props = defineProps({
   movie: {
     type: Object,
     required: true,
   },
 });
+
+// Funció helper per construir la URL de la imatge
+const getImageUrl = (posterPath) => {
+  return withApiBase(posterPath);
+};
 </script>
 
 <style scoped>

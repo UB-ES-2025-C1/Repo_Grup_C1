@@ -14,8 +14,8 @@ services:
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
     volumes:
-      - .backend/media:/app/media
-      - .backend/db.sqlite3:/app/db.sqlite3
+      - ./backend/media:/app/media
+      - ./backend/db.sqlite3:/app/db.sqlite3
     expose:
       - "8000"
     networks:
