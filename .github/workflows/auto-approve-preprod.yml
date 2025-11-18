@@ -1,0 +1,100 @@
+name: Auto-approve PR
+
+on:
+  pull_request:
+    branches: [ pre-prod, main ]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    # S'executa si el PR és de develop a pre-prod O de pre-prod a main
+    if: |
+      (github.event.pull_request.base.ref == 'pre-prod' && github.event.pull_request.head.ref == 'develop') ||
+      (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'pre-prod')
+    permissions:
+      pull-requests: write
+      contents: read
+      checks: read
+
+    steps:
+      - name: Wait for status checks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = context.payload.pull_request.head.sha;
+            const maxWait = 600000; // 10 minuts màxim
+            const checkInterval = 15000; // Comprova cada 15 segons
+            const startTime = Date.now();
+            
+            console.log(`Esperant que els tests acabin per al commit ${sha}...`);
+            
+            while (Date.now() - startTime < maxWait) {
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: sha,
+              });
+              
+              const frontendTest = checks.check_runs.find(
+                check => check.name === 'Frontend Tests'
+              );
+              const backendTest = checks.check_runs.find(
+                check => check.name === 'Backend Tests'
+              );
+              
+              // Comprova si ambdós tests existeixen i han acabat
+              if (frontendTest && backendTest) {
+                const bothCompleted = 
+                  frontendTest.status === 'completed' && 
+                  backendTest.status === 'completed';
+                
+                const bothPassed = 
+                  frontendTest.conclusion === 'success' && 
+                  backendTest.conclusion === 'success';
+                
+                if (bothCompleted && bothPassed) {
+                  console.log('✅ Tots els tests han passat!');
+                  return;
+                } else if (bothCompleted && !bothPassed) {
+                  throw new Error('❌ Alguns tests han fallat. No es pot aprovar el PR.');
+                }
+              }
+              
+              console.log('Esperant que els tests acabin...');
+              await new Promise(resolve => setTimeout(resolve, checkInterval));
+            }
+            
+            throw new Error('Timeout: Els tests no han acabat en el temps esperat.');
+
+      - name: Auto-approve PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+            
+            // Comprova si ja hi ha una aprovació
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            
+            const hasApproval = reviews.some(
+              review => review.state === 'APPROVED'
+            );
+            
+            if (!hasApproval) {
+              await github.rest.pulls.createReview({
+                owner,
+                repo,
+                pull_number: number,
+                event: 'APPROVE',
+                body: '✅ Auto-aprovat: Tots els tests han passat correctament.'
+              });
+              console.log('PR auto-aprovat!');
+            } else {
+              console.log('El PR ja té una aprovació.');
+            }
+
