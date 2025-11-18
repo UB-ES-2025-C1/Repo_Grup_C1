@@ -8,6 +8,7 @@ from django.contrib.auth import authenticate
 from .models import Rating
 from rest_framework.exceptions import ValidationError
 from axes.handlers.database import AxesDatabaseHandler
+from .models import Profile
     
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -234,3 +235,20 @@ class RatingSerializer(serializers.ModelSerializer):
 
         rating = Rating.objects.create(movie=movie, user=user, **validated_data)
         return rating
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    # Obtenemos el username desde el modelo User relacionado
+    username = serializers.CharField(source='user.username', read_only=True)
+    
+    # El campo 'average_rating' viene de la propiedad del modelo Profile
+    average_rating = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Profile
+        fields = ['username', 'bio', 'photo', 'average_rating']
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        # Solo incluimos los campos que el usuario puede editar
+        fields = ['bio', 'photo']

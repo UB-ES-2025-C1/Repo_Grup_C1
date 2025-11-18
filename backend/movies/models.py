@@ -4,6 +4,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import Avg
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import Avg
 
 
 class Movie(models.Model):
@@ -121,3 +122,26 @@ class Rating(models.Model):
 
     def __str__(self):
         return f'{self.movie} - {self.user.username}: {self.overall_score}'
+    
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    bio = models.TextField(blank=True, null=True)
+    photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+
+    @property
+    def average_rating(self):
+        """
+        Calcula la media de todas las valoraciones ('overall_score')
+        hechas por este usuario.
+        """
+        # Usamos 'user.rating_set' para acceder a los ratings relacionados
+        aggregation = self.user.rating_set.aggregate(average=Avg('overall_score'))
+        avg = aggregation.get('average')
+
+        if avg is None:
+            return 0
+        
+        return round(avg, 1)
+
+    def __str__(self):
+        return f'{self.user.username} Profile'

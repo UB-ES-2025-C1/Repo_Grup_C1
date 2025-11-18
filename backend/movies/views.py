@@ -8,6 +8,8 @@ from .serializers import UserRegisterSerializer, UserLoginSerializer, MovieSeria
 from django.db.models import Avg
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import permissions, generics
+from .models import Profile
+from .serializers import UserProfileSerializer, ProfileUpdateSerializer
 
 
 class UserRegisterAPIView(generics.CreateAPIView):
@@ -121,5 +123,36 @@ class UserMovieRatingAPIView(generics.RetrieveUpdateDestroyAPIView):
     headers: { Authorization: `Bearer ${accessToken}` }
     }).then(res => console.log(res.data));
     '''
+class UserProfileDetailAPIView(generics.RetrieveAPIView):
+    """
+    Vista para ver el perfil de un usuario. Accesible públicamente.
+    """
+    queryset = Profile.objects.all().select_related('user') # Optimización para obtener el usuario en la misma consulta
+    serializer_class = UserProfileSerializer
+    permission_classes = [permissions.AllowAny] # Importante para que sea público
+    lookup_field = 'user__username' # Le decimos a DRF que busque por el username del usuario relacionado
+
+
+class MyProfileAPIView(generics.RetrieveUpdateAPIView):
+    """
+    Permite al usuario autenticado ver y actualizar su propio perfil.
+    """
+    serializer_class = ProfileUpdateSerializer
+    permission_classes = [permissions.IsAuthenticated] # Solo usuarios autenticados
+
+    def get_object(self):
+        """
+        Sobrescribimos este método para devolver siempre el perfil
+        del usuario que realiza la petición (request.user).
+        """
+        # self.request.user está disponible gracias a IsAuthenticated
+        return self.request.user.profile
+
+    # Opcional: si quieres que al ver el perfil (GET) se usen los datos
+    # del serializador público, puedes hacer esto:
+    def get_serializer_class(self):
+        if self.request.method in ['PUT', 'PATCH']:
+            return ProfileUpdateSerializer
+        return UserProfileSerializer
 
     
