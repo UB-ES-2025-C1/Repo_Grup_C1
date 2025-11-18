@@ -2,9 +2,9 @@ name: Backend Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, pre-prod ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, pre-prod ]
 
 jobs:
   test:
@@ -32,3 +32,4 @@ jobs:
       - name: Run tests
         working-directory: backend
         run: python manage.py test
+        continue-on-error: false
