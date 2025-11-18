@@ -375,6 +375,45 @@ class TestProfileAPI(APITestCase):
         self.assertNotEqual(self.user1.profile.bio, 'hacked bio')
         self.assertEqual(self.user1.profile.bio, "This is user1's bio.")
 
+    def test_get_user_ratings_list_returns_correct_data(self):
+        """
+        Tests the /profiles/<username>/ratings/ endpoint.
+        """
+        url = f'/movies/profiles/{self.user1.username}/ratings/'
+        response = self.client.get(url, format='json')
+
+        # Check for a successful response
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check that the number of ratings is correct (user1 has 2 ratings)
+        self.assertEqual(len(response.data), 2)
+
+        # Check the content of one of the ratings to ensure it's correct
+        # The list is ordered by most recent, so the last one created will be first.
+        first_rating_in_response = response.data[0]
+        self.assertEqual(first_rating_in_response['overall_score'], 6) # Corresponds to movie2 rating
+        self.assertEqual(first_rating_in_response['movie_tconst'], 'tt9000002')
+
+    def test_get_user_ratings_list_for_user_with_no_ratings(self):
+        """
+        Tests that the endpoint returns an empty list for a user with no ratings.
+        """
+        # We create a new user who has no ratings
+        user3 = User.objects.create_user(username='user3', email='user3@test.com', password='pw')
+        url = f'/movies/profiles/{user3.username}/ratings/'
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0) # Should be an empty list
+
+    def test_get_user_ratings_list_for_nonexistent_user(self):
+        """
+        Tests that the endpoint returns a 404 Not Found for a user that does not exist.
+        """
+        url = '/movies/profiles/nonexistentuser/ratings/'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
 
 
 

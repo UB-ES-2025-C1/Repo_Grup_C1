@@ -65,6 +65,15 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
     
+    def validate_username(self, value):
+        """
+        Check that the username is not a reserved keyword like 'me'.
+        """
+        # We check "me", "Me", "ME", etc.
+        if value.lower() == 'me':
+            raise serializers.ValidationError("This username is reserved. Please choose another one.")
+        return value
+    
 
 class UserLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
