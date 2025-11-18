@@ -138,7 +138,7 @@ async function deleteRating() {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    deleteSuccess.value = 'Your rating has been deleted.';
+    deleteSuccess.value = '';
     hasUserRating.value = false;
     ratingPreview.value = null;
 
@@ -188,7 +188,7 @@ async function deleteComment() {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    commentDeleteSuccess.value = 'Comment removed from your rating.';
+    commentDeleteSuccess.value = '';
     // update local preview
     if (ratingPreview.value) ratingPreview.value.comment = '';
 

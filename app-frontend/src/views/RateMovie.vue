@@ -70,11 +70,11 @@ const success = ref(null);
 const movieTitle = ref(null);
 
 const form = ref({
-  overall_score: 5,
-  soundtrack: 5,
-  acting: 5,
-  cinematography: 5,
-  plot: 5,
+  overall_score: 10,
+  soundtrack: 10,
+  acting: 10,
+  cinematography: 10,
+  plot: 10,
   comment: ''
 });
 
