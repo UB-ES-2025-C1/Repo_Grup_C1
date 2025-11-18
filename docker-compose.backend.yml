@@ -1,0 +1,30 @@
+services:
+  backend:
+    container_name: ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      # Assegura que Django veu host i CSRF des del .env
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-cinemaub.settings}
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+    volumes:
+      - ./backend/media:/app/media
+      - ./backend/db.sqlite3:/app/db.sqlite3
+    expose:
+      - "8000"
+    networks:
+      web:
+        aliases:
+          # Alias ÚNIC per aquest stack
+          - ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-backend
+    restart: unless-stopped
+
+networks:
+  web:
+    external: true

@@ -5,7 +5,8 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 # Si el frontend consulta el backend via variable d'entorn:
-ARG VITE_API_BASE_URL=/api
+# Valor per defecte per a preprod (relatiu, sense /api)
+ARG VITE_API_BASE_URL=/
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 

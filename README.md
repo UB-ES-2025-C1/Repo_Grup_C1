@@ -40,6 +40,26 @@ Usa el siguiente usuario admin:
 - Usuario: admin  
 - Contraseña: password
 
+### Backend Testing Setup
+
+Ejecutar los tests
+
+```
+# si aún no lo has hecho:
+# cd backend
+python manage.py test -v 2
+```
+Generar htmlcov(coverage de los unit tests backend):
+pip install -r requirements.txt
+coverage run manage.py test movies
+coverage html # o coverage report (si quieres verlo rápidamente en terminal)
+
+Crear venv-locust para hacer pruebas con locustfile.py(para la pueba de stress):
+python -m venv venv-locust
+.\venv-locust\Scripts\actívate 
+pip install locust
+locust -f locustfile.py #Al abrir la interfaz locust poner host = https://cinemaub-beta.llurbatech.com/
+
 ## Terminal del frontend
 
 ### Navega al directorio del frontend
@@ -69,7 +89,12 @@ El proyecto incluye soporte de tests unitarios con Vitest y Vue Test Utils.
 Ejecutar los tests
 
 ```
-cd app-frontend
+# si aún no lo has hecho:
+# cd app-frontend
 npm install
 npm test
 ```
+
+#Generar carpeta coverage de los unit tests en frontend:
+npm install
+npm run test:coverage

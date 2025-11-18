@@ -1,9 +1,5 @@
 <template>
-  <header class="header">
-    <router-link to="/" class="brand">
-      <span class="dot"></span> CINEMA UB
-    </router-link>
-  </header>
+  <AppHeader />
 
   <main class="container">
     <h1>Rate: {{ movieTitle || tconst }}</h1>
@@ -57,6 +53,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import AppHeader from '@/components/AppHeader.vue'
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { getApiBaseUrl, withApiBase } from '@/utils/api';

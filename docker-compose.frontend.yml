@@ -1,0 +1,24 @@
+services:
+  frontend:
+    container_name: ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-frontend
+    build:
+      context: ./app-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
+    env_file:
+      - .env
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
+    expose:
+      - "80"
+    networks:
+      web:
+        aliases:
+          # Alias ÚNIC per aquest stack
+          - ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-frontend
+    restart: unless-stopped
+
+networks:
+  web:
+    external: true

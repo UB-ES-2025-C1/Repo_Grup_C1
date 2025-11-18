@@ -31,4 +31,19 @@ const router = createRouter({
   }
 })
 
+// guarda la última ruta visitada (excepto login/register)
+router.beforeEach((to, from, next) => {
+  // no guardar login/register
+  const skipNames = ['login', 'register']
+  if (!skipNames.includes(to.name)) {
+    // Usa sessionStorage (se borra con la pestaña)
+    try {
+      sessionStorage.setItem('lastPath', to.fullPath)
+    } catch (e) {
+      // fallback silencioso
+    }
+  }
+  next()
+})
+
 export default router

@@ -1,10 +1,5 @@
 <template>
-  <!-- Usamos el header que ya tienes definido -->
-  <header class="header">
-    <router-link to="/" class="brand">
-      <span class="dot"></span> CINEMA UB
-    </router-link>
-  </header>
+  <AppHeader />
 
   <div class="container">
     <!-- Estado de carga -->
@@ -18,7 +13,7 @@
     <!-- Contenido cuando la película ha cargado -->
     <div v-else-if="movie" class="movie-details">
       <div class="poster">
-        <img :src="API_BASE_URL + movie.poster_path" :alt="`Poster of ${movie.primaryTitle}`" />
+        <img :src="getImageUrl(movie.poster_path)" :alt="`Poster of ${movie.primaryTitle}`" />
       </div>
       <div class="info">
         <h1>{{ movie.primaryTitle }} ({{ movie.startYear }})</h1>
@@ -53,10 +48,14 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import AppHeader from '@/components/AppHeader.vue'
 import axios from 'axios';
-import { getApiBaseUrl, withApiBase } from '@/utils/api';
+import { withApiBase } from '@/utils/api';
 
-const API_BASE_URL = getApiBaseUrl();
+// Funció helper per construir la URL de la imatge
+const getImageUrl = (posterPath) => {
+  return withApiBase(posterPath);
+};
 
 // 1. Recibimos 'tconst' como una prop gracias a `props: true` en el router
 const props = defineProps({
