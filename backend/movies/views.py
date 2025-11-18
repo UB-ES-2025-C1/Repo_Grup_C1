@@ -125,32 +125,31 @@ class UserMovieRatingAPIView(generics.RetrieveUpdateDestroyAPIView):
     '''
 class UserProfileDetailAPIView(generics.RetrieveAPIView):
     """
-    Vista para ver el perfil de un usuario. Accesible públicamente.
+    View to see a user's profile. Publicly accessible.
     """
-    queryset = Profile.objects.all().select_related('user') # Optimización para obtener el usuario en la misma consulta
+    queryset = Profile.objects.all().select_related('user') # Optimization to fetch the user in the same query
     serializer_class = UserProfileSerializer
-    permission_classes = [permissions.AllowAny] # Importante para que sea público
-    lookup_field = 'user__username' # Le decimos a DRF que busque por el username del usuario relacionado
-
+    permission_classes = [permissions.AllowAny] # Important to make it public!
+    lookup_field = 'user__username' # We tell DRF to look up by the related user's username
 
 class MyProfileAPIView(generics.RetrieveUpdateAPIView):
     """
-    Permite al usuario autenticado ver y actualizar su propio perfil.
+    Allows the authenticated user to view and update their own profile.
     """
-    serializer_class = ProfileUpdateSerializer
-    permission_classes = [permissions.IsAuthenticated] # Solo usuarios autenticados
+    permission_classes = [permissions.IsAuthenticated] # Only authenticated users
 
     def get_object(self):
         """
-        Sobrescribimos este método para devolver siempre el perfil
-        del usuario que realiza la petición (request.user).
+        We override this method to always return the profile
+        of the user making the request (request.user).
         """
-        # self.request.user está disponible gracias a IsAuthenticated
+        # self.request.user is available thanks to IsAuthenticated
         return self.request.user.profile
 
-    # Opcional: si quieres que al ver el perfil (GET) se usen los datos
-    # del serializador público, puedes hacer esto:
     def get_serializer_class(self):
+        """
+        Optional: Use a different serializer for reading vs. writing.
+        """
         if self.request.method in ['PUT', 'PATCH']:
             return ProfileUpdateSerializer
         return UserProfileSerializer
