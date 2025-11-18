@@ -188,7 +188,7 @@ class TestAuthEndpoints(APITestCase):
 
 class TestRatingAPI(APITestCase):
 	"""
-	TESTS US3.1 (Create or update a rating of a movie via API)
+	TESTS US3.1 AND US3.2 (Create, update or delete a rating of a movie via API)
 	"""
 	def setUp(self):
 		self.client = APIClient()
@@ -247,6 +247,28 @@ class TestRatingAPI(APITestCase):
 		self.assertEqual(resp3.status_code, status.HTTP_200_OK)
 		# The response should contain the overall_score we set
 		self.assertEqual(resp3.data.get('overall_score'), 5)
+
+	def test_delete_rating_authenticated(self):
+		# Create a rating first
+		rating = Rating.objects.create(
+			movie=self.movie,
+			user=self.user,
+			overall_score=7,
+			soundtrack=6,
+			acting=8,
+			cinematography=7,
+			plot=7,
+			comment="Good"
+		)
+
+		self.client.force_authenticate(user=self.user)
+		delete_url = f'/movies/ratings/{self.movie.tconst}/'
+
+		resp = self.client.delete(delete_url, format='json')
+		self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+
+		# The rating should no longer exist
+		self.assertFalse(Rating.objects.filter(movie=self.movie, user=self.user).exists())
 
 
 

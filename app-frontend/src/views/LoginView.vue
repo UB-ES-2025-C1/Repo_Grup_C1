@@ -15,6 +15,12 @@
         <form @submit.prevent="logout" style="display:grid;gap:.75rem">
           <button type="submit" style="background-color:#f1807e">Log out</button>
         </form>
+        <p style="color:#94a3b8; margin-top:1rem; text-align:center">
+          Are you lost?
+          <router-link to="/" style="color:#3b82f6; text-decoration:none; font-weight:500;">
+            Go Home
+          </router-link>
+        </p>
       </div>
       <div v-else>
         <p style="color:#94a3b8; margin:0 0 1rem">Welcome back! Please log in to your account.</p>
@@ -133,4 +139,5 @@ onMounted(() => {
     isLoggedIn.value = false;
   }
 });
+
 </script>
