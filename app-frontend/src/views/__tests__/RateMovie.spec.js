@@ -171,13 +171,13 @@ describe('RateMovie', () => {
     })
 
     const form = wrapper.vm.form
-    // overall_score por defecto: 5
-    expect(form.overall_score).toBe(5)
+    // overall_score por defecto: 10
+    expect(form.overall_score).toBe(10)
     // otros campos también por defecto
-    expect(form.soundtrack).toBe(5)
-    expect(form.acting).toBe(5)
-    expect(form.cinematography).toBe(5)
-    expect(form.plot).toBe(5)
+    expect(form.soundtrack).toBe(10)
+    expect(form.acting).toBe(10)
+    expect(form.cinematography).toBe(10)
+    expect(form.plot).toBe(10)
     expect(form.comment).toBe('')
 
     // No mensaje de error global

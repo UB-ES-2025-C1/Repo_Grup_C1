@@ -38,7 +38,7 @@
         </div>
         <div class="actions" style="margin-top:1rem">
                 <router-link :to="{ name: 'movie-rate', params: { tconst: movie.tconst } }">
-                  <button>{{ hasUserRating ? 'Change rating' : 'Rate' }}</button>
+                  <button class="primary">{{ hasUserRating ? 'Change rating' : 'Rate' }}</button>
                 </router-link>
                 <!-- Delete button shown when the user already has a rating -->
                 <button v-if="hasUserRating" class="ghost" @click="deleteRating" style="margin-left:.5rem">Delete rating</button>
