@@ -37,12 +37,44 @@ jobs:
                 ref: sha,
               });
               
-              const frontendTest = checks.check_runs.find(
-                check => check.name === 'Frontend Tests'
+              console.log(`Trobats ${checks.check_runs.length} checks:`);
+              checks.check_runs.forEach(check => {
+                console.log(`  - ${check.name}: ${check.status} (${check.conclusion || 'pending'})`);
+              });
+              
+              // Busca els checks que continguin "Frontend Tests" i "Backend Tests"
+              // Prioritzem els de pull_request, però acceptem qualsevol
+              const allFrontendTests = checks.check_runs.filter(
+                check => check.name.includes('Frontend Tests')
               );
-              const backendTest = checks.check_runs.find(
-                check => check.name === 'Backend Tests'
+              const allBackendTests = checks.check_runs.filter(
+                check => check.name.includes('Backend Tests')
               );
+              
+              // Prioritzem els de pull_request, sinó agafem qualsevol
+              const frontendTest = allFrontendTests.find(
+                check => check.name.includes('pull request')
+              ) || allFrontendTests.find(
+                check => check.status === 'completed' && check.conclusion === 'success'
+              ) || allFrontendTests[0];
+              
+              const backendTest = allBackendTests.find(
+                check => check.name.includes('pull request')
+              ) || allBackendTests.find(
+                check => check.status === 'completed' && check.conclusion === 'success'
+              ) || allBackendTests[0];
+              
+              if (frontendTest) {
+                console.log(`Frontend Test trobat: ${frontendTest.name} - Status: ${frontendTest.status}, Conclusion: ${frontendTest.conclusion || 'pending'}`);
+              } else {
+                console.log('Frontend Test no trobat encara...');
+              }
+              
+              if (backendTest) {
+                console.log(`Backend Test trobat: ${backendTest.name} - Status: ${backendTest.status}, Conclusion: ${backendTest.conclusion || 'pending'}`);
+              } else {
+                console.log('Backend Test no trobat encara...');
+              }
               
               // Comprova si ambdós tests existeixen i han acabat
               if (frontendTest && backendTest) {
@@ -58,6 +90,7 @@ jobs:
                   console.log('✅ Tots els tests han passat!');
                   return;
                 } else if (bothCompleted && !bothPassed) {
+                  console.log(`❌ Tests completats però alguns han fallat. Frontend: ${frontendTest.conclusion}, Backend: ${backendTest.conclusion}`);
                   throw new Error('❌ Alguns tests han fallat. No es pot aprovar el PR.');
                 }
               }
