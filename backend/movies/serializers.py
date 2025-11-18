@@ -237,10 +237,10 @@ class RatingSerializer(serializers.ModelSerializer):
         return rating
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    # Obtenemos el username desde el modelo User relacionado
+    # Get the username from the related User model
     username = serializers.CharField(source='user.username', read_only=True)
     
-    # El campo 'average_rating' viene de la propiedad del modelo Profile
+    # The 'average_rating' field comes from the Profile model's property
     average_rating = serializers.FloatField(read_only=True)
 
     class Meta:
@@ -250,5 +250,5 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        # Solo incluimos los campos que el usuario puede editar
+        # We only include the fields that the user can edit
         fields = ['bio', 'photo']

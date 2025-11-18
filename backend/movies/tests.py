@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 
-from .models import Movie, Rating
+from .models import Movie, Rating, Profile
 
 
 class TestMovieGetAPI(APITestCase):
@@ -269,6 +269,111 @@ class TestRatingAPI(APITestCase):
 
 		# The rating should no longer exist
 		self.assertFalse(Rating.objects.filter(movie=self.movie, user=self.user).exists())
+
+class TestProfileAPI(APITestCase):
+    """
+    TESTS for User Profiles functionality.
+    """
+    def setUp(self):
+        # We create users. The profile should be created automatically by the signal.
+        self.user1 = User.objects.create_user(username='testuser1', email='user1@test.com', password='Testpassword1')
+        self.user2 = User.objects.create_user(username='testuser2', email='user2@test.com', password='Testpassword2')
+
+        # We add data to user1's profile for testing.
+        self.user1.profile.bio = "This is user1's bio."
+        self.user1.profile.save()
+
+        # We create movies and ratings to test the average calculation.
+        movie1 = Movie.objects.create(tconst='tt9000001', primary_title='Movie A')
+        movie2 = Movie.objects.create(tconst='tt9000002', primary_title='Movie B')
+        
+        # user1 rates two movies (average of 8 and 6 = 7.0).
+        Rating.objects.create(movie=movie1, user=self.user1, overall_score=8)
+        Rating.objects.create(movie=movie2, user=self.user1, overall_score=6)
+        
+        # user2 rates one movie.
+        Rating.objects.create(movie=movie1, user=self.user2, overall_score=9)
+
+    def test_profile_is_created_on_user_registration(self):
+        """Verifies that the post_save signal creates a Profile for a new User."""
+        self.assertTrue(hasattr(self.user1, 'profile'))
+        self.assertIsInstance(self.user1.profile, Profile)
+        self.assertEqual(User.objects.count(), Profile.objects.count())
+
+    def test_public_profile_endpoint_is_accessible(self):
+        """Tests that anyone (unauthenticated) can view a public profile."""
+        url = f'/movies/profiles/{self.user1.username}/'
+        response = self.client.get(url, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # We verify that the data is correct.
+        self.assertEqual(response.data['username'], self.user1.username)
+        self.assertEqual(response.data['bio'], self.user1.profile.bio)
+
+    def test_public_profile_average_rating_is_correct(self):
+        """Tests that the average rating is calculated and displayed correctly."""
+        url = f'/movies/profiles/{self.user1.username}/'
+        response = self.client.get(url, format='json')
+
+        # The expected average for user1 is (8 + 6) / 2 = 7.0
+        self.assertEqual(response.data['average_rating'], 7.0)
+
+        # We check user2's average just to be sure.
+        url_user2 = f'/movies/profiles/{self.user2.username}/'
+        response_user2 = self.client.get(url_user2, format='json')
+        self.assertEqual(response_user2.data['average_rating'], 9.0)
+
+    def test_my_profile_endpoint_requires_authentication(self):
+        """Tests that /profiles/me/ returns 401 if the user is not authenticated."""
+        url = '/movies/profiles/me/'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        
+        # We also test with the PATCH method.
+        response_patch = self.client.patch(url, {'bio': 'attempt'}, format='json')
+        self.assertEqual(response_patch.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_authenticated_user_can_view_own_profile(self):
+        """Tests that a logged-in user can make a GET request to /profiles/me/."""
+        url = '/movies/profiles/me/'
+        self.client.force_authenticate(user=self.user1) # We simulate the login.
+        response = self.client.get(url, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['username'], self.user1.username)
+
+    def test_authenticated_user_can_update_own_profile(self):
+        """Tests that a logged-in user can make a PATCH request to update their profile."""
+        url = '/movies/profiles/me/'
+        self.client.force_authenticate(user=self.user1)
+        
+        new_bio = "This is my updated bio."
+        payload = {'bio': new_bio}
+        
+        response = self.client.patch(url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['bio'], new_bio)
+        
+        # We verify that the change has been saved to the database.
+        self.user1.profile.refresh_from_db()
+        self.assertEqual(self.user1.profile.bio, new_bio)
+
+    def test_user_cannot_update_another_users_profile(self):
+        """Ensures a user cannot update another user's profile via the /me/ endpoint."""
+        url = '/movies/profiles/me/'
+        self.client.force_authenticate(user=self.user2) # We log in as user2.
+        
+        # We try to change user1's bio (but the endpoint points to /me/, which is user2's profile).
+        payload = {'bio': 'hacked bio'}
+        self.client.patch(url, payload, format='json')
+
+        # We refresh user1's profile data from the DB.
+        self.user1.profile.refresh_from_db()
+
+        # user1's bio should NOT have changed.
+        self.assertNotEqual(self.user1.profile.bio, 'hacked bio')
+        self.assertEqual(self.user1.profile.bio, "This is user1's bio.")
 
 
 

@@ -131,10 +131,10 @@ class Profile(models.Model):
     @property
     def average_rating(self):
         """
-        Calcula la media de todas las valoraciones ('overall_score')
-        hechas por este usuario.
+        Calculates the average of all 'overall_score' ratings
+        made by this user.
         """
-        # Usamos 'user.rating_set' para acceder a los ratings relacionados
+        # We use 'user.rating_set' to access the related ratings
         aggregation = self.user.rating_set.aggregate(average=Avg('overall_score'))
         avg = aggregation.get('average')
 
