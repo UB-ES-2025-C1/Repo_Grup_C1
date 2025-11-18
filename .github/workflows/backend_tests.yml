@@ -32,4 +32,3 @@ jobs:
       - name: Run tests
         working-directory: backend
         run: python manage.py test
-        continue-on-error: false
