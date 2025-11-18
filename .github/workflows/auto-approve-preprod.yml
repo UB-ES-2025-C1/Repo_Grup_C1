@@ -37,65 +37,51 @@ jobs:
                 ref: sha,
               });
               
-              console.log(`Trobats ${checks.check_runs.length} checks:`);
-              checks.check_runs.forEach(check => {
+              // Filtra el check del propi workflow (auto-approve)
+              const otherChecks = checks.check_runs.filter(
+                check => !check.name.includes('auto-approve') && 
+                         !check.name.includes('Auto-approve')
+              );
+              
+              console.log(`Trobats ${checks.check_runs.length} checks totals, ${otherChecks.length} checks a esperar (excloent auto-approve):`);
+              otherChecks.forEach(check => {
                 console.log(`  - ${check.name}: ${check.status} (${check.conclusion || 'pending'})`);
               });
               
-              // Busca els checks que continguin "Frontend Tests" i "Backend Tests"
-              // Prioritzem els de pull_request, però acceptem qualsevol
-              const allFrontendTests = checks.check_runs.filter(
-                check => check.name.includes('Frontend Tests')
-              );
-              const allBackendTests = checks.check_runs.filter(
-                check => check.name.includes('Backend Tests')
+              // Comprova si tots els checks han acabat
+              const allCompleted = otherChecks.every(
+                check => check.status === 'completed'
               );
               
-              // Prioritzem els de pull_request, sinó agafem qualsevol
-              const frontendTest = allFrontendTests.find(
-                check => check.name.includes('pull request')
-              ) || allFrontendTests.find(
-                check => check.status === 'completed' && check.conclusion === 'success'
-              ) || allFrontendTests[0];
-              
-              const backendTest = allBackendTests.find(
-                check => check.name.includes('pull request')
-              ) || allBackendTests.find(
-                check => check.status === 'completed' && check.conclusion === 'success'
-              ) || allBackendTests[0];
-              
-              if (frontendTest) {
-                console.log(`Frontend Test trobat: ${frontendTest.name} - Status: ${frontendTest.status}, Conclusion: ${frontendTest.conclusion || 'pending'}`);
-              } else {
-                console.log('Frontend Test no trobat encara...');
-              }
-              
-              if (backendTest) {
-                console.log(`Backend Test trobat: ${backendTest.name} - Status: ${backendTest.status}, Conclusion: ${backendTest.conclusion || 'pending'}`);
-              } else {
-                console.log('Backend Test no trobat encara...');
-              }
-              
-              // Comprova si ambdós tests existeixen i han acabat
-              if (frontendTest && backendTest) {
-                const bothCompleted = 
-                  frontendTest.status === 'completed' && 
-                  backendTest.status === 'completed';
+              if (allCompleted && otherChecks.length > 0) {
+                // Comprova si tots han passat
+                const allPassed = otherChecks.every(
+                  check => check.conclusion === 'success'
+                );
                 
-                const bothPassed = 
-                  frontendTest.conclusion === 'success' && 
-                  backendTest.conclusion === 'success';
-                
-                if (bothCompleted && bothPassed) {
-                  console.log('✅ Tots els tests han passat!');
+                if (allPassed) {
+                  console.log(`✅ Tots els ${otherChecks.length} checks han passat correctament!`);
                   return;
-                } else if (bothCompleted && !bothPassed) {
-                  console.log(`❌ Tests completats però alguns han fallat. Frontend: ${frontendTest.conclusion}, Backend: ${backendTest.conclusion}`);
-                  throw new Error('❌ Alguns tests han fallat. No es pot aprovar el PR.');
+                } else {
+                  // Alguns checks han fallat
+                  const failedChecks = otherChecks.filter(
+                    check => check.conclusion !== 'success'
+                  );
+                  console.log(`❌ Alguns checks han fallat:`);
+                  failedChecks.forEach(check => {
+                    console.log(`  - ${check.name}: ${check.conclusion}`);
+                  });
+                  throw new Error(`❌ ${failedChecks.length} check(s) han fallat. No es pot aprovar el PR.`);
                 }
+              } else if (otherChecks.length === 0) {
+                console.log('⚠️ No s\'han trobat altres checks. Esperant...');
+              } else {
+                const pendingCount = otherChecks.filter(
+                  check => check.status !== 'completed'
+                ).length;
+                console.log(`⏳ Esperant que ${pendingCount} check(s) acabin...`);
               }
               
-              console.log('Esperant que els tests acabin...');
               await new Promise(resolve => setTimeout(resolve, checkInterval));
             }
             
