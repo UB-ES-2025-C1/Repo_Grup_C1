@@ -78,7 +78,7 @@ onMounted(async () => {
     const data = response.data;
     username.value = data.username;
     avatarUrl.value = data.photo || defaultAvatar;
-    bio.value = data.bio;
+    bio.value = data.bio || "This user does not have a biography.";
     averageRating.value = data.average_rating;
 
     const response2 = await axios.get(withApiBase(`/movies/profiles/${username.value}/ratings/`), {
