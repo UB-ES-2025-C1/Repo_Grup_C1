@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -154,4 +154,22 @@ class MyProfileAPIView(generics.RetrieveUpdateAPIView):
             return ProfileUpdateSerializer
         return UserProfileSerializer
 
-    
+# Add this new view at the end
+class UserRatingsListAPIView(generics.ListAPIView):
+    """
+    Provides a public, read-only list of all ratings made by a specific user.
+    """
+    serializer_class = RatingSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        """
+        This view should return a list of all the ratings for the
+        user as determined by the username portion of the URL.
+        """
+        # Get the username from the URL kwargs
+        username = self.kwargs['user__username']
+        # Find the user, or return a 404 if they don't exist
+        user = get_object_or_404(User, username=username)
+        # Filter the ratings queryset to only include ratings from that user
+        return Rating.objects.filter(user=user).order_by('-id') # Order by most recent
