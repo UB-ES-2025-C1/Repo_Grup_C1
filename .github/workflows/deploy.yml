@@ -1,0 +1,58 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ main, pre-prod ]
+  workflow_dispatch:  # Permite ejecución manual
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Set deployment path based on branch
+        id: set_path
+        run: |
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            echo "repo_path=/srv/ub/Repo_Grup_C1" >> $GITHUB_OUTPUT
+            echo "branch=main" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_name }}" == "pre-prod" ]; then
+            echo "repo_path=/srv/ub/Repo_Grup_C1_preprod" >> $GITHUB_OUTPUT
+            echo "branch=pre-prod" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            REPO_PATH="${{ steps.set_path.outputs.repo_path }}"
+            BRANCH="${{ steps.set_path.outputs.branch }}"
+            
+            echo "Deploying to: $REPO_PATH"
+            echo "Branch: $BRANCH"
+            
+            cd $REPO_PATH
+            
+            # Parar los contenedores
+            echo "Stopping containers..."
+            docker-compose -f docker-compose.backend.yml down || true
+            docker-compose -f docker-compose.frontend.yml down || true
+            
+            # Hacer pull del código (sin cambiar de rama)
+            echo "Pulling latest code..."
+            git pull origin
+            
+            # Reconstruir y levantar los contenedores
+            echo "Building and starting containers..."
+            docker-compose -f docker-compose.backend.yml up -d --build
+            docker-compose -f docker-compose.frontend.yml up -d --build
+            
+            # Limpiar imágenes huérfanas (opcional)
+            echo "Cleaning up unused images..."
+            docker image prune -f
+            
+            echo "Deployment completed successfully!"
