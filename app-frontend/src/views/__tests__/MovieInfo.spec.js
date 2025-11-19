@@ -165,7 +165,7 @@ describe('MovieInfo', () => {
 
     expect(wrapper.find('.user-rating-preview').exists()).toBe(false)
 
-    const button = wrapper.get('button')
+    const button = wrapper.get('button.primary')
     expect(button.text()).toBe('Rate')
 
     // Con este escenario solo se debe haber llamado una vez (detalle de película)
@@ -192,8 +192,16 @@ describe('MovieInfo', () => {
     expect(text).toContain('Plot: 9')
     expect(text).toContain('Great movie!')
 
-    const button = wrapper.get('button')
-    expect(button.text()).toBe('Change Rating')
+    const button = wrapper.get('button.primary')
+    expect(button.text()).toBe('Change rating')
+
+    const ghostButtons = wrapper.findAll('button.ghost') // NodeArray
+
+    const deleteRatingBtn = ghostButtons.find(b => b.text().trim() === 'Delete rating')
+    const deleteCommentBtn = ghostButtons.find(b => b.text().trim() === 'Delete comment')
+
+    expect(deleteRatingBtn).toBeTruthy()
+    expect(deleteCommentBtn).toBeTruthy()
 
     // Debe haberse llamado 2 veces: detalle + rating
     expect(axios.get).toHaveBeenCalledTimes(2)
@@ -211,7 +219,7 @@ describe('MovieInfo', () => {
     expect(wrapper.find('.user-rating-preview').exists()).toBe(false)
 
     // Botón debe decir "Rate"
-    const button = wrapper.get('button')
+    const button = wrapper.get('button.primary')
     expect(button.text()).toBe('Rate')
 
     // Aun así se llama a ambas APIs

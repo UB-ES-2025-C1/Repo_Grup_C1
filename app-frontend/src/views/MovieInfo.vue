@@ -37,10 +37,18 @@
           <p v-if="ratingPreview.comment" class="comment">"{{ ratingPreview.comment }}"</p>
         </div>
         <div class="actions" style="margin-top:1rem">
-          <router-link :to="{ name: 'movie-rate', params: { tconst: movie.tconst } }">
-            <button>{{ hasUserRating ? 'Change Rating' : 'Rate' }}</button>
-          </router-link>
+                <router-link :to="{ name: 'movie-rate', params: { tconst: movie.tconst } }">
+                  <button class="primary">{{ hasUserRating ? 'Change rating' : 'Rate' }}</button>
+                </router-link>
+                <!-- Delete button shown when the user already has a rating -->
+                <button v-if="hasUserRating" class="ghost" @click="deleteRating" style="margin-left:.5rem">Delete rating</button>
+                <!-- Delete comment button shown when the user has a comment on their rating -->
+                <button v-if="hasUserRating && ratingPreview && ratingPreview.comment" class="ghost" @click="deleteComment" style="margin-left:.5rem">Delete comment</button>
         </div>
+              <p v-if="deleteSuccess" class="success" style="margin-top:.5rem">{{ deleteSuccess }}</p>
+              <p v-if="deleteError" class="error" style="margin-top:.5rem">{{ deleteError }}</p>
+              <p v-if="commentDeleteSuccess" class="success" style="margin-top:.5rem">{{ commentDeleteSuccess }}</p>
+              <p v-if="commentDeleteError" class="error" style="margin-top:.5rem">{{ commentDeleteError }}</p>
       </div>
     </div>
   </div>
@@ -71,6 +79,10 @@ const loading = ref(true);
 const error = ref(null);
 const hasUserRating = ref(false);
 const ratingPreview = ref(null);
+const deleteError = ref(null);
+const deleteSuccess = ref(null);
+const commentDeleteError = ref(null);
+const commentDeleteSuccess = ref(null);
 
 // 3. Cuando el componente se monta, llamamos a la API
 onMounted(async () => {
@@ -106,6 +118,97 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+async function deleteRating() {
+  deleteError.value = null;
+  deleteSuccess.value = null;
+
+  // confirmation dialog
+  const confirmed = window.confirm('Are you sure you want to delete your rating? This action cannot be undone.');
+  if (!confirmed) return;
+
+  const token = localStorage.getItem('access');
+  if (!token) {
+    deleteError.value = 'Not authenticated.';
+    return;
+  }
+
+  try {
+    await axios.delete(withApiBase(`/movies/ratings/${props.tconst}/`), {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    deleteSuccess.value = '';
+    hasUserRating.value = false;
+    ratingPreview.value = null;
+
+    // Refresh movie data to update numVotes / average_rating
+    try {
+      const resp = await axios.get(withApiBase(`/movies/${props.tconst}/`));
+      movie.value = resp.data;
+    } catch (fetchErr) {
+      console.warn('Could not refresh movie after delete', fetchErr);
+    }
+  } catch (err) {
+    console.error(err);
+    if (err.response && err.response.data) {
+      deleteError.value = err.response.data.detail || JSON.stringify(err.response.data);
+    } else {
+      deleteError.value = 'Error deleting rating.';
+    }
+  }
+}
+
+async function deleteComment() {
+  commentDeleteError.value = null;
+  commentDeleteSuccess.value = null;
+
+  const confirmed = window.confirm('Are you sure you want to delete your comment from your rating?');
+  if (!confirmed) return;
+
+  const token = localStorage.getItem('access');
+  if (!token) {
+    commentDeleteError.value = 'Not authenticated.';
+    return;
+  }
+
+  // Build payload using existing rating preview values, but with empty comment
+  const payload = {
+    movie: props.tconst,
+    overall_score: ratingPreview.value?.overall_score ?? 0,
+    soundtrack: ratingPreview.value?.soundtrack ?? 0,
+    acting: ratingPreview.value?.acting ?? 0,
+    cinematography: ratingPreview.value?.cinematography ?? 0,
+    plot: ratingPreview.value?.plot ?? 0,
+    comment: ''
+  };
+
+  try {
+    await axios.post(withApiBase(`/movies/ratings/`), payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    commentDeleteSuccess.value = '';
+    // update local preview
+    if (ratingPreview.value) ratingPreview.value.comment = '';
+
+    // Optionally refresh movie aggregates
+    try {
+      const resp = await axios.get(withApiBase(`/movies/${props.tconst}/`));
+      movie.value = resp.data;
+    } catch (refreshErr) {
+      // non-fatal
+      console.warn('Could not refresh movie after comment delete', refreshErr);
+    }
+  } catch (err) {
+    console.error(err);
+    if (err.response && err.response.data) {
+      commentDeleteError.value = err.response.data.detail || JSON.stringify(err.response.data);
+    } else {
+      commentDeleteError.value = 'Error removing comment.';
+    }
+  }
+}
 </script>
 
 <style scoped>

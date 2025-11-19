@@ -8,6 +8,7 @@ from django.contrib.auth import authenticate
 from .models import Rating
 from rest_framework.exceptions import ValidationError
 from axes.handlers.database import AxesDatabaseHandler
+from .models import Profile
     
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -63,6 +64,15 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
+    
+    def validate_username(self, value):
+        """
+        Check that the username is not a reserved keyword like 'me'.
+        """
+        # We check "me", "Me", "ME", etc.
+        if value.lower() == 'me':
+            raise serializers.ValidationError("This username is reserved. Please choose another one.")
+        return value
     
 
 class UserLoginSerializer(serializers.Serializer):
@@ -234,3 +244,20 @@ class RatingSerializer(serializers.ModelSerializer):
 
         rating = Rating.objects.create(movie=movie, user=user, **validated_data)
         return rating
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    # Get the username from the related User model
+    username = serializers.CharField(source='user.username', read_only=True)
+    
+    # The 'average_rating' field comes from the Profile model's property
+    average_rating = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Profile
+        fields = ['username', 'bio', 'photo', 'average_rating']
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        # We only include the fields that the user can edit
+        fields = ['bio', 'photo']

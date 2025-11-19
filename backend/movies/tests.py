@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 
-from .models import Movie, Rating
+from .models import Movie, Rating, Profile
 
 
 class TestMovieGetAPI(APITestCase):
@@ -188,7 +188,7 @@ class TestAuthEndpoints(APITestCase):
 
 class TestRatingAPI(APITestCase):
 	"""
-	TESTS US3.1 (Create or update a rating of a movie via API)
+	TESTS US3.1 AND US3.2 (Create, update or delete a rating of a movie via API)
 	"""
 	def setUp(self):
 		self.client = APIClient()
@@ -247,6 +247,172 @@ class TestRatingAPI(APITestCase):
 		self.assertEqual(resp3.status_code, status.HTTP_200_OK)
 		# The response should contain the overall_score we set
 		self.assertEqual(resp3.data.get('overall_score'), 5)
+
+	def test_delete_rating_authenticated(self):
+		# Create a rating first
+		rating = Rating.objects.create(
+			movie=self.movie,
+			user=self.user,
+			overall_score=7,
+			soundtrack=6,
+			acting=8,
+			cinematography=7,
+			plot=7,
+			comment="Good"
+		)
+
+		self.client.force_authenticate(user=self.user)
+		delete_url = f'/movies/ratings/{self.movie.tconst}/'
+
+		resp = self.client.delete(delete_url, format='json')
+		self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+
+		# The rating should no longer exist
+		self.assertFalse(Rating.objects.filter(movie=self.movie, user=self.user).exists())
+
+class TestProfileAPI(APITestCase):
+    """
+    TESTS for User Profiles functionality.
+    """
+    def setUp(self):
+        # We create users. The profile should be created automatically by the signal.
+        self.user1 = User.objects.create_user(username='testuser1', email='user1@test.com', password='Testpassword1')
+        self.user2 = User.objects.create_user(username='testuser2', email='user2@test.com', password='Testpassword2')
+
+        # We add data to user1's profile for testing.
+        self.user1.profile.bio = "This is user1's bio."
+        self.user1.profile.save()
+
+        # We create movies and ratings to test the average calculation.
+        movie1 = Movie.objects.create(tconst='tt9000001', primary_title='Movie A')
+        movie2 = Movie.objects.create(tconst='tt9000002', primary_title='Movie B')
+        
+        # user1 rates two movies (average of 8 and 6 = 7.0).
+        Rating.objects.create(movie=movie1, user=self.user1, overall_score=8)
+        Rating.objects.create(movie=movie2, user=self.user1, overall_score=6)
+        
+        # user2 rates one movie.
+        Rating.objects.create(movie=movie1, user=self.user2, overall_score=9)
+
+    def test_profile_is_created_on_user_registration(self):
+        """Verifies that the post_save signal creates a Profile for a new User."""
+        self.assertTrue(hasattr(self.user1, 'profile'))
+        self.assertIsInstance(self.user1.profile, Profile)
+        self.assertEqual(User.objects.count(), Profile.objects.count())
+
+    def test_public_profile_endpoint_is_accessible(self):
+        """Tests that anyone (unauthenticated) can view a public profile."""
+        url = f'/movies/profiles/{self.user1.username}/'
+        response = self.client.get(url, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # We verify that the data is correct.
+        self.assertEqual(response.data['username'], self.user1.username)
+        self.assertEqual(response.data['bio'], self.user1.profile.bio)
+
+    def test_public_profile_average_rating_is_correct(self):
+        """Tests that the average rating is calculated and displayed correctly."""
+        url = f'/movies/profiles/{self.user1.username}/'
+        response = self.client.get(url, format='json')
+
+        # The expected average for user1 is (8 + 6) / 2 = 7.0
+        self.assertEqual(response.data['average_rating'], 7.0)
+
+        # We check user2's average just to be sure.
+        url_user2 = f'/movies/profiles/{self.user2.username}/'
+        response_user2 = self.client.get(url_user2, format='json')
+        self.assertEqual(response_user2.data['average_rating'], 9.0)
+
+    def test_my_profile_endpoint_requires_authentication(self):
+        """Tests that /profiles/me/ returns 401 if the user is not authenticated."""
+        url = '/movies/profiles/me/'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        
+        # We also test with the PATCH method.
+        response_patch = self.client.patch(url, {'bio': 'attempt'}, format='json')
+        self.assertEqual(response_patch.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_authenticated_user_can_view_own_profile(self):
+        """Tests that a logged-in user can make a GET request to /profiles/me/."""
+        url = '/movies/profiles/me/'
+        self.client.force_authenticate(user=self.user1) # We simulate the login.
+        response = self.client.get(url, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['username'], self.user1.username)
+
+    def test_authenticated_user_can_update_own_profile(self):
+        """Tests that a logged-in user can make a PATCH request to update their profile."""
+        url = '/movies/profiles/me/'
+        self.client.force_authenticate(user=self.user1)
+        
+        new_bio = "This is my updated bio."
+        payload = {'bio': new_bio}
+        
+        response = self.client.patch(url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['bio'], new_bio)
+        
+        # We verify that the change has been saved to the database.
+        self.user1.profile.refresh_from_db()
+        self.assertEqual(self.user1.profile.bio, new_bio)
+
+    def test_user_cannot_update_another_users_profile(self):
+        """Ensures a user cannot update another user's profile via the /me/ endpoint."""
+        url = '/movies/profiles/me/'
+        self.client.force_authenticate(user=self.user2) # We log in as user2.
+        
+        # We try to change user1's bio (but the endpoint points to /me/, which is user2's profile).
+        payload = {'bio': 'hacked bio'}
+        self.client.patch(url, payload, format='json')
+
+        # We refresh user1's profile data from the DB.
+        self.user1.profile.refresh_from_db()
+
+        # user1's bio should NOT have changed.
+        self.assertNotEqual(self.user1.profile.bio, 'hacked bio')
+        self.assertEqual(self.user1.profile.bio, "This is user1's bio.")
+
+    def test_get_user_ratings_list_returns_correct_data(self):
+        """
+        Tests the /profiles/<username>/ratings/ endpoint.
+        """
+        url = f'/movies/profiles/{self.user1.username}/ratings/'
+        response = self.client.get(url, format='json')
+
+        # Check for a successful response
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check that the number of ratings is correct (user1 has 2 ratings)
+        self.assertEqual(len(response.data), 2)
+
+        # Check the content of one of the ratings to ensure it's correct
+        # The list is ordered by most recent, so the last one created will be first.
+        first_rating_in_response = response.data[0]
+        self.assertEqual(first_rating_in_response['overall_score'], 6) # Corresponds to movie2 rating
+        self.assertEqual(first_rating_in_response['movie_tconst'], 'tt9000002')
+
+    def test_get_user_ratings_list_for_user_with_no_ratings(self):
+        """
+        Tests that the endpoint returns an empty list for a user with no ratings.
+        """
+        # We create a new user who has no ratings
+        user3 = User.objects.create_user(username='user3', email='user3@test.com', password='pw')
+        url = f'/movies/profiles/{user3.username}/ratings/'
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0) # Should be an empty list
+
+    def test_get_user_ratings_list_for_nonexistent_user(self):
+        """
+        Tests that the endpoint returns a 404 Not Found for a user that does not exist.
+        """
+        url = '/movies/profiles/nonexistentuser/ratings/'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 
