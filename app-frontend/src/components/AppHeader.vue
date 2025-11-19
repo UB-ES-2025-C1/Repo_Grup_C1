@@ -11,7 +11,13 @@
         <!-- If logged in, show nothing here by default (you can provide a profile slot) -->
         <template v-if="isLoggedIn">
           <!-- Default when logged: show a simple Logout link placeholder (can be overridden) -->
-          <router-link to="/profile"><button class="ghost">Profile</button></router-link>
+           <slot name="logout">
+            <router-link to="/login"><button class="logout ghost">Log out</button></router-link>
+          </slot>
+          <router-link to="/profile"><button class="profile-btn">
+            <span>{{ username }}</span>
+            <img :src="avatarUrl" alt="Avatar" class="avatar" />
+          </button></router-link>
         </template>
 
         <!-- When not logged, render login and signup via named slots with defaults -->
@@ -29,14 +35,44 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import defaultAvatar from '@/assets/default-avatar.webp';
+import { ref, onMounted } from 'vue';
+import axios from 'axios';
+import { withApiBase } from '@/utils/api';
+
 const isLoggedIn = ref(false);
+const username = ref(null);
+const avatarUrl = ref(null);
+
 // Comprobar si ya está logueado
 try {
     isLoggedIn.value = !!localStorage.getItem('access');
 } catch (e) {
     isLoggedIn.value = false;
 }
+
+// Si está logueado, cargar los datos
+onMounted(async () => {
+  if (isLoggedIn.value) {
+    username.value = localStorage.getItem('username');
+    avatarUrl.value = localStorage.getItem('avatarUrl') || defaultAvatar;
+
+    if (!username.value || !avatarUrl.value) {
+      try {
+        const response = await axios.get(withApiBase('/movies/profiles/me/'));
+        
+        const data = response.data;
+        username.value = data.username;
+        avatarUrl.value = data.photo || defaultAvatar;
+        
+        localStorage.setItem('username', username.value);
+        localStorage.setItem('avatarUrl', avatarUrl.value);
+      } catch (e) {
+        console.error('Error loading user info', e);
+      }
+    }
+  }
+})
 </script>
 
 <style scoped>
@@ -47,12 +83,14 @@ try {
   justify-content: space-between;
   padding: 1rem;
 }
+
 .brand {
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
 }
+
 .brand .dot {
   width: 10px;
   height: 10px;
@@ -60,6 +98,27 @@ try {
   border-radius: 50%;
   display: inline-block;
 }
+
 .actions { display: inline-flex; gap: 0.5rem; }
+
 .ghost { background: transparent; border: 1px solid #334155; color: var(--text); padding: 0.5rem 1rem; border-radius: 8px }
+
+.logout {
+  height: 100%;
+}
+
+.profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.profile-btn .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #334155;
+}
 </style>

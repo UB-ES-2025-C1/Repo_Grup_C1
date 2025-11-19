@@ -52,6 +52,9 @@ const mountMovieInfo = async ({
 
   if (withToken) {
     window.localStorage.setItem('access', 'fake-token')
+    window.localStorage.setItem('refresh', 'fake-token')
+    window.localStorage.setItem('username', 'fake-username')
+    window.localStorage.setItem('avatar', 'fake-avatar')
   }
 
   // Mock de axios.get según la URL

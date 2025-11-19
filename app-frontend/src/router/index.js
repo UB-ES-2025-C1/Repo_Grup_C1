@@ -3,6 +3,7 @@ import HomeView from '@/views/HomeView.vue'
 import MovieInfo from '@/views/MovieInfo.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import LoginView from '@/views/LoginView.vue'
+import ProfileView from '@/views/ProfileView.vue'
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
@@ -20,7 +21,20 @@ const routes = [
     props: true
   },
   { path: '/register', name: 'register', component: RegisterView } ,
-  { path: '/login', name: 'login', component: LoginView } 
+  { path: '/login', name: 'login', component: LoginView },
+  {
+    path: '/profile',
+    name: 'my-profile',
+    component: ProfileView,
+    props: () => ({ username: 'me' }),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/:username',
+    name: 'user-profile',
+    component: ProfileView,
+    props: true
+  },
 ]
 
 const router = createRouter({
@@ -45,5 +59,19 @@ router.beforeEach((to, from, next) => {
   }
   next()
 })
+
+// se asegura que se haya iniciado sesion para las paginas que lo requieren
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresAuth && !isLoggedIn()) {
+    next('/login')
+  } else {
+    next()
+  }
+})
+
+// mira si el usuario esta autenticado
+function isLoggedIn() {
+  return !!localStorage.getItem('access')
+}
 
 export default router
