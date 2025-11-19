@@ -73,17 +73,29 @@ const login = async () => {
     });
 
     // Si el backend devuelve access y data es correcto
-    loading.value = false;
     const data = response.data;
     localStorage.setItem('access', data.access);
     localStorage.setItem('refresh', data.refresh);
 
-    // Recuperar la última ruta guardada
-    let redirect = null
+    // Obtener la información del perfil de usuario para el header
     try {
-      redirect = sessionStorage.getItem('lastPath')
+      const response2 = await axios.get(withApiBase('/movies/profiles/me/'));
+      
+      const data2 = response2.data;
+      localStorage.setItem('username', username.value);
+      localStorage.setItem('avatarUrl', avatarUrl.value);
     } catch (e) {
-      redirect = null
+      console.error('Error loading user info', e);
+    }
+
+    loading.value = false;
+
+    // Recuperar la última ruta guardada
+    let redirect = null;
+    try {
+      redirect = sessionStorage.getItem('lastPath');
+    } catch (e) {
+      redirect = null;
     }
 
     // Validaciones de seguridad: debe ser ruta interna y no ser /login o /register
@@ -113,8 +125,10 @@ const login = async () => {
 
 const logout = async () => {
   try {
-    localStorage.removeItem('access')
-    localStorage.removeItem('refresh')
+    localStorage.removeItem('access');
+    localStorage.removeItem('refresh');
+    localStorage.removeItem('username');
+    localStorage.removeItem('avatarUrl');
 
     // Volver a la pagina de inicio
     router.push('/');

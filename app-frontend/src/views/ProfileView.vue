@@ -48,9 +48,9 @@
 </template>
 
 <script setup>
-import AppHeader from '@/components/AppHeader.vue'
+import AppHeader from '@/components/AppHeader.vue';
 import RatingCard from '@/components/RatingCard.vue';
-import defaultAvatar from '@/assets/default-avatar.webp'
+import defaultAvatar from '@/assets/default-avatar.webp';
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { withApiBase } from '@/utils/api';
