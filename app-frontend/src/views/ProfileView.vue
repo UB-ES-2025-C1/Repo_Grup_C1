@@ -16,13 +16,52 @@
 
       <!-- CABECERA DEL PERFIL -->
       <div class="profile-details">
-        <img class="avatar" :src="avatarUrl" alt="Avatar">
+        <img class="avatar" :src="avatarUrl || defaultAvatar" alt="Avatar">
 
         <div class="info">
           <h1>{{ username }}</h1>
-          <p class="bio">{{ bio }}</p>
+          <p class="bio">{{ bio || "This user does not have a biography." }}</p>
           <p class="average-rating">Rating average: <strong>{{ averageRating }}</strong></p>
         </div>
+      </div>
+
+      <!-- EDICIÓN DEL PERFIL -->
+      <div v-if="isOwnProfile" style="margin-top:1rem">
+        <button @click="editing = !editing">
+          Edit profile
+        </button>
+      </div>
+      <div v-if="editing" class="edit-form">
+        <h3>Edit profile</h3>
+
+        <div class="form">
+          <div class="field">
+            <label>Bio</label>
+            <textarea v-model="newBio" rows="4"></textarea>
+            <button @click="newBio = ''">Remove Profile Bio</button>
+          </div>
+
+          <div class="field">
+            <label>Photo</label>
+            <input type="file" ref="newAvatar" style="display:none" @change="handleChangedAvatar">
+            <button @click="openAvatarPicker" :class="{ disabled: removeAvatar }">
+              {{ removeAvatar ? "Removing Profile Photo" : 
+                                newAvatarFile ? newAvatarFile.name : "Choose Photo" }}
+            </button>
+            <button v-if="newAvatarFile" @click="clearSelectedPhoto">Clear Selection</button>
+            <button @click="removePhoto">
+              {{ removeAvatar ? "Cancel Remove Profile Photo" : "Remove Profile Photo" }}
+            </button>
+          </div>
+        </div>
+        
+        <div class="actions">
+          <button @click="saveChanges" class="primary">Save</button>
+          <button @click="cancelChanges" class="secondary">Cancel</button>
+        </div>
+
+        <div v-if="updating" class="empty">Updating profile...</div>
+        <div v-else-if="errorUpdating" style="color:red">{{ errorUpdating }}</div>
       </div>
 
       <hr>
@@ -51,7 +90,7 @@
 import AppHeader from '@/components/AppHeader.vue';
 import RatingCard from '@/components/RatingCard.vue';
 import defaultAvatar from '@/assets/default-avatar.webp';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import { withApiBase } from '@/utils/api';
 
@@ -68,8 +107,18 @@ const avatarUrl = ref(null);
 const bio = ref(null);
 const averageRating = ref(null);
 const ratedMovies = ref([]);
+
+const isOwnProfile = computed(() => props.username === 'me');
+const editing = ref(false);
+const newBio = ref('');
+const newAvatar = ref(null);
+const newAvatarFile = ref(null);
+const removeAvatar = ref(false);
+
 const loading = ref(true);
 const error = ref(null);
+const updating = ref(false);
+const errorUpdating = ref(null);
 
 onMounted(async () => {
   try {
@@ -77,9 +126,10 @@ onMounted(async () => {
     
     const data = response.data;
     username.value = data.username;
-    avatarUrl.value = data.photo || defaultAvatar;
-    bio.value = data.bio || "This user does not have a biography.";
+    avatarUrl.value = data.photo;
+    bio.value = data.bio;
     averageRating.value = data.average_rating;
+    newBio.value = bio.value || '';
 
     const response2 = await axios.get(withApiBase(`/movies/profiles/${username.value}/ratings/`), {
       user: username.value
@@ -88,7 +138,6 @@ onMounted(async () => {
     loading.value = false;
     const data2 = response2.data;
     ratedMovies.value = data2 || [];
-    console.log(ratedMovies.value);
   } catch (err) {
     loading.value = false;
     if (err.response?.data?.detail) {
@@ -101,8 +150,70 @@ onMounted(async () => {
 });
 
 // --- MÉTODOS (Acciones del usuario) ---
+function openAvatarPicker() {
+  newAvatar.value.click();
+}
 
+function handleChangedAvatar(event) {
+  newAvatarFile.value = event.target.files[0];
+}
 
+function clearSelectedPhoto() {
+  newAvatar.value.value = null;
+  newAvatarFile.value = null;
+}
+
+function removePhoto() {
+  newAvatar.value.value = null;
+  newAvatarFile.value = null;
+  removeAvatar.value = !removeAvatar.value;
+}
+
+const saveChanges = async () => {
+  try {
+    updating.value = true;
+
+    const formData = new FormData();
+    formData.append('bio', newBio.value);
+    if (newAvatarFile.value) {
+      formData.append('photo', newAvatarFile.value);
+      formData.append('photo', newAvatarFile.value);
+    }
+    if (removeAvatar.value) formData.append('remove_photo', 'true');
+
+    const response = await axios.patch(
+      withApiBase('/movies/profiles/me/'), 
+      formData, 
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    // Refrescar la vista
+    const data = response.data;
+    console.log(data);
+    bio.value = data.bio;
+    avatarUrl.value = data.photo;
+    newBio.value = bio.value || '';
+    newAvatar.value.value = null;
+    newAvatarFile.value = null;
+
+    updating.value = false;
+    editing.value = false;
+
+  } catch (err) {
+    if (err.response?.data?.detail) {
+      errorUpdating.value = err.response.data.detail[0];
+    } else {
+      errorUpdating.value = "Error saving profile.";
+    }
+  }
+};
+
+function cancelChanges() {
+  newBio.value = bio.value || '';
+  newAvatar.value.value = null;
+  newAvatarFile.value = null;
+  removeAvatar.value = false;
+}
 </script>
 
 <style scoped>
@@ -148,5 +259,36 @@ onMounted(async () => {
   display: flex;
   gap: 1.5rem;
   font-size: 1.1rem;
+}
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ccc;
+  padding: 1rem;
+  border-radius: 12px;
+  margin: 1rem;
+}
+
+.edit-form .form {
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-form .field {
+  display: flex;
+  flex-direction: column;
+  margin: 1rem;
+  gap: 1em;
+}
+
+.edit-form .actions {
+  display: flex;
+  gap: 1rem;
+}
+
+button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
