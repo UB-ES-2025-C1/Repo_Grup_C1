@@ -185,18 +185,27 @@ class MovieSerializer(serializers.ModelSerializer):
         return 0 if obj.ratings.count() == 0 else obj.ratings.count()
 
 
+class MovieMiniSerializer(serializers.ModelSerializer):
+    '''
+    Mini serializer to get basic information of a movie.
+    '''
+    class Meta:
+        model = Movie
+        fields = ['tconst', 'primary_title', 'start_year', 'poster_path']
+
+
 class RatingSerializer(serializers.ModelSerializer):
     # Accept movie tconst in input (write-only). We look up the Movie in create().
     movie = serializers.CharField(write_only=True)
-    # Expose movie.tconst on reads
-    movie_tconst = serializers.CharField(source='movie.tconst', read_only=True)
+    # Expose movie info on reads
+    movie_info = MovieMiniSerializer(source='movie', read_only=True)
 
     class Meta:
         model = Rating
         fields = [
             'id',
             'movie',
-            'movie_tconst',
+            'movie_info',
             'overall_score',
             'soundtrack',
             'acting',

@@ -172,4 +172,4 @@ class UserRatingsListAPIView(generics.ListAPIView):
         # Find the user, or return a 404 if they don't exist
         user = get_object_or_404(User, username=username)
         # Filter the ratings queryset to only include ratings from that user
-        return Rating.objects.filter(user=user).order_by('-id') # Order by most recent
+        return Rating.objects.filter(user=user).select_related('movie').order_by('-id') # Order by most recent

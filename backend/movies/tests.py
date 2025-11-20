@@ -392,7 +392,12 @@ class TestProfileAPI(APITestCase):
         # The list is ordered by most recent, so the last one created will be first.
         first_rating_in_response = response.data[0]
         self.assertEqual(first_rating_in_response['overall_score'], 6) # Corresponds to movie2 rating
-        self.assertEqual(first_rating_in_response['movie_tconst'], 'tt9000002')
+        self.assertEqual(first_rating_in_response['movie_info']['tconst'], 'tt9000002')
+        self.assertEqual(first_rating_in_response['movie_info']['primary_title'], 'Movie B')
+        second_rating_in_response = response.data[1]
+        self.assertEqual(second_rating_in_response['overall_score'], 8) # Corresponds to movie1 rating
+        self.assertEqual(second_rating_in_response['movie_info']['tconst'], 'tt9000001')
+        self.assertEqual(second_rating_in_response['movie_info']['primary_title'], 'Movie A')
 
     def test_get_user_ratings_list_for_user_with_no_ratings(self):
         """
