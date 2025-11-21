@@ -1,6 +1,6 @@
 services:
   frontend:
-    container_name: ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-frontend
+    container_name: ${CONTAINER_NAME_FRONTEND:-cinemaub-prod-frontend}
     build:
       context: ./app-frontend
       dockerfile: Dockerfile
@@ -16,7 +16,7 @@ services:
       web:
         aliases:
           # Alias ÚNIC per aquest stack
-          - ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-frontend
+          - ${CONTAINER_NAME_FRONTEND:-cinemaub-prod-frontend}
     restart: unless-stopped
 
 networks:

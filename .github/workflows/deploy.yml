@@ -37,6 +37,17 @@ jobs:
             
             cd $REPO_PATH
             
+            # Definir nombres de contenedores según el entorno
+            if [ "$BRANCH" == "main" ]; then
+              export CONTAINER_NAME_BACKEND="cinemaub-prod-backend"
+              export CONTAINER_NAME_FRONTEND="cinemaub-prod-frontend"
+            elif [ "$BRANCH" == "pre-prod" ]; then
+              export CONTAINER_NAME_BACKEND="cinemaub-preprod-backend"
+              export CONTAINER_NAME_FRONTEND="cinemaub-preprod-frontend"
+            fi
+            
+            echo "Container names: $CONTAINER_NAME_BACKEND, $CONTAINER_NAME_FRONTEND"
+            
             # Parar los contenedores
             echo "Stopping containers..."
             docker-compose -f docker-compose.backend.yml down || true
