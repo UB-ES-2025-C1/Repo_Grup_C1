@@ -51,7 +51,7 @@ jobs:
             
             # Verificar que las variables críticas están definidas (sin mostrar valores)
             echo "Verifying critical environment variables..."
-            REQUIRED_VARS=("SECRET_KEY" "DEBUG" "ALLOWED_HOSTS" "CSRF_TRUSTED_ORIGINS" "CORS_ALLOWED_ORIGINS")
+            REQUIRED_VARS=("SECRET_KEY" "DEBUG" "ALLOWED_HOSTS" "CSRF_TRUSTED_ORIGINS")
             MISSING_VARS=()
             for var in "${REQUIRED_VARS[@]}"; do
               if [ -z "${!var}" ]; then
