@@ -81,8 +81,8 @@ jobs:
             
             # Parar los contenedores
             echo "Stopping containers..."
-            docker-compose -f docker-compose.backend.yml down || true
-            docker-compose -f docker-compose.frontend.yml down || true
+            docker compose -f docker-compose.backend.yml down || true
+            docker compose -f docker-compose.frontend.yml down || true
             
             # Hacer pull del código (sin cambiar de rama)
             echo "Pulling latest code..."
@@ -90,8 +90,8 @@ jobs:
             
             # Reconstruir y levantar los contenedores
             echo "Building and starting containers..."
-            docker-compose -f docker-compose.backend.yml up -d --build
-            docker-compose -f docker-compose.frontend.yml up -d --build
+            docker compose -f docker-compose.backend.yml up -d --build
+            docker compose -f docker-compose.frontend.yml up -d --build
             
             # Limpiar imágenes huérfanas (opcional)
             echo "Cleaning up unused images..."
