@@ -1,6 +1,6 @@
 services:
   backend:
-    container_name: ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-backend
+    container_name: ${CONTAINER_NAME_BACKEND:-cinemaub-prod-backend}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -13,6 +13,7 @@ services:
       DEBUG: ${DEBUG:-False}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
     volumes:
       - ./backend/media:/app/media
       - ./backend/db.sqlite3:/app/db.sqlite3
@@ -22,7 +23,7 @@ services:
       web:
         aliases:
           # Alias ÚNIC per aquest stack
-          - ${APP_NAME:-cinemaub}${ENV_TAG:+-}${ENV_TAG}-backend
+          - ${CONTAINER_NAME_BACKEND:-cinemaub-prod-backend}
     restart: unless-stopped
 
 networks:
