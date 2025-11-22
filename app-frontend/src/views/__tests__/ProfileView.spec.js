@@ -25,7 +25,11 @@ const mountProfileView = async ({
     username = 'test',
     profileStatus = 200,
     ratingsStatus = 200,
-    errorMessage = 'Test error.'
+    errorMessage = 'Test error.',
+    isEditProfile = false,
+    newBio = '',
+    newPhoto = '',
+    removeAvatar = false
 }) => {
   // Reset mocks y localStorage
   axios.get.mockReset()
@@ -56,8 +60,26 @@ const mountProfileView = async ({
         }
         throw err
       }
+      if (!isEditProfile) {
+        return {
+          data: mockProfileResponse
+        }
+      }
+        
+      if (!removeAvatar) {
+        return {
+          data: {
+            bio: newBio || mockProfileResponse.bio,
+            photo: newPhoto || mockProfileResponse.photo
+          }
+        }
+      }
+
       return {
-        data: mockProfileResponse
+        data: {
+          bio: newBio || mockProfileResponse.bio,
+          photo: ''
+        }
       }
     }
 
@@ -137,6 +159,10 @@ const mockRatingsResponse = [
   }
 ]
 
+const mockEditProfileResponse = {
+
+}
+
 describe('ProfileView', () => {
   it('carga correctamente el perfil y muestra los datos', async () => {
     const wrapper = await mountProfileView({})
@@ -190,4 +216,118 @@ describe('ProfileView', () => {
 
     expect(wrapper.text()).toContain('Error loading profile.')
   })
+
+  it('muestra el boton de editar perfil si es tu propio perfil', async () => {
+    const wrapper = await mountProfileView({
+      username: 'me'
+    })
+
+    expect(wrapper.text()).toContain("Edit profile")
+  })
+
+  it('no muestra el boton de editar perfil si es el perfil de otro usuario', async () => {
+    const wrapper = await mountProfileView({
+      username: 'other'
+    })
+
+    expect(wrapper.text()).not.toContain("Edit profile")
+  })
+
+  it('muestra el formulario para editar perfil al hacer clic en el boton de editar perfil', async () => {
+    const wrapper = await mountProfileView({
+      username: 'me'
+    })
+
+    await wrapper.find('#edit-profile-btn').trigger('click')
+
+    expect(wrapper.text()).toContain('Edit profile')
+    expect(wrapper.text()).toContain('Bio')
+    expect(wrapper.text()).toContain('Remove Profile Bio')
+    expect(wrapper.text()).toContain('Photo')
+    expect(wrapper.text()).toContain('Remove Profile Photo')
+    expect(wrapper.text()).toContain('Save')
+    expect(wrapper.text()).toContain('Cancel')
+  })
+
+  it('elimina la bio al hacer clic en el boton para eliminar la bio', async () => {
+    const wrapper = await mountProfileView({
+      username: 'me'
+    })
+
+    await wrapper.find('#edit-profile-btn').trigger('click')
+
+    const bioTextArea = wrapper.find('#bio-text-area')
+    bioTextArea.setValue('Test bio')
+    expect(wrapper.vm.newBio).toBe('Test bio')
+    
+    await wrapper.find('#remove-bio-btn').trigger('click')
+    expect(wrapper.vm.newBio).toBe('')
+  })
+
+  test('al seleccionar archivo, se guarda, se muestra su nombre y aparece el boton para quitar la seleccion', async () => {
+    const wrapper = await mountProfileView({
+      username: 'me'
+    })
+
+    await wrapper.find('#edit-profile-btn').trigger('click')
+
+    const file = new File(['test'], 'avatar.jpg', { type: 'image/jpeg' });
+
+    await wrapper.vm.handleChangedAvatar({ target: { files: [file] } });
+
+    expect(wrapper.vm.newAvatarFile.name).toBe('avatar.jpg')
+    expect(wrapper.text()).toContain('avatar.jpg')
+    expect(wrapper.text()).toContain('Clear Selection')
+  })
+
+  test('si removeAvatar=true, el botón de subir foto queda deshabilitado y se indica que se va a eliminar la foto de perfil', async () => {
+    const wrapper = await mountProfileView({
+      username: 'me'
+    })
+
+    await wrapper.find('#edit-profile-btn').trigger('click')
+    wrapper.vm.$.setupState.removeAvatar = true
+    await flushPromises()
+
+    const button = wrapper.find('#photo-selector-btn')
+
+    expect(button.exists()).toBe(true)
+    expect(button.classes()).toContain('disabled')
+    expect(wrapper.text()).toContain('Removing Profile Photo')
+    expect(wrapper.text()).toContain('Cancel Remove Profile Photo')
+    expect(wrapper.vm.newAvatarFile).toBe(null)
+  })
+
+  test('saveChanges envía formData con bio y foto', async () => {
+    const file = new File(["avatar"], "avatar.jpg", { type: "image/jpeg" })
+    axios.patch = vi.fn().mockResolvedValueOnce({
+      data: { bio: 'New test bio', photo: '/photo.png' }
+    })
+
+    const wrapper = await mountProfileView({
+      username: 'me'
+    })
+
+    await wrapper.find('#edit-profile-btn').trigger('click')
+
+    await wrapper.find('#bio-text-area').setValue('New test bio')
+    await wrapper.vm.handleChangedAvatar({ target: { files: [file] } });
+
+    await wrapper.find('#save-btn').trigger('click')
+
+    await flushPromises()
+
+    expect(axios.patch).toHaveBeenCalledTimes(1)
+    const [url, body, config] = axios.patch.mock.calls[0]
+
+    expect(url).toContain('/movies/profiles/me')
+    expect(body instanceof FormData).toBe(true)
+
+    expect(body.get('bio')).toBe('New test bio')
+
+    const sentFile = body.get('photo')
+    expect(sentFile).toBeInstanceOf(File)
+    expect(sentFile.name).toBe('avatar.jpg')
+    expect(sentFile.type).toBe('image/jpeg')
+  });
 })

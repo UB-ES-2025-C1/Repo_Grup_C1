@@ -27,7 +27,7 @@
 
       <!-- EDICIÓN DEL PERFIL -->
       <div v-if="isOwnProfile" style="margin-top:1rem">
-        <button @click="editing = !editing">
+        <button @click="editing = !editing" id="edit-profile-btn">
           Edit profile
         </button>
       </div>
@@ -37,18 +37,18 @@
         <div class="form">
           <div class="field">
             <label>Bio</label>
-            <textarea v-model="newBio" rows="4"></textarea>
-            <button @click="newBio = ''">Remove Profile Bio</button>
+            <textarea v-model="newBio" rows="4" id="bio-text-area"></textarea>
+            <button @click="newBio = ''" id="remove-bio-btn">Remove Profile Bio</button>
           </div>
 
           <div class="field">
             <label>Photo</label>
             <input type="file" ref="newAvatar" style="display:none" @change="handleChangedAvatar">
-            <button @click="openAvatarPicker" :class="{ disabled: removeAvatar }">
+            <button @click="openAvatarPicker" :class="{ disabled: removeAvatar }" id="photo-selector-btn">
               {{ removeAvatar ? "Removing Profile Photo" : 
                                 newAvatarFile ? newAvatarFile.name : "Choose Photo" }}
             </button>
-            <button v-if="newAvatarFile" @click="clearSelectedPhoto">Clear Selection</button>
+            <button v-if="newAvatarFile" @click="clearSelectedPhoto" id="clear-photo-selection-btn">Clear Selection</button>
             <button @click="removePhoto">
               {{ removeAvatar ? "Cancel Remove Profile Photo" : "Remove Profile Photo" }}
             </button>
@@ -56,8 +56,8 @@
         </div>
         
         <div class="actions">
-          <button @click="saveChanges" class="primary">Save</button>
-          <button @click="cancelChanges" class="secondary">Cancel</button>
+          <button @click="saveChanges" class="primary" id="save-btn">Save</button>
+          <button @click="cancelChanges" class="secondary" id="cancel-btn">Cancel</button>
         </div>
 
         <div v-if="updating" class="empty">Updating profile...</div>
@@ -176,7 +176,6 @@ const saveChanges = async () => {
     const formData = new FormData();
     formData.append('bio', newBio.value);
     if (newAvatarFile.value) {
-      formData.append('photo', newAvatarFile.value);
       formData.append('photo', newAvatarFile.value);
     }
     if (removeAvatar.value) formData.append('remove_photo', 'true');
