@@ -9,6 +9,7 @@ Run with:
 
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
@@ -419,7 +420,95 @@ class TestProfileAPI(APITestCase):
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_authenticated_user_can_upload_profile_photo(self):
+        """
+		Test that the user can upload profile photo via PATCH /me/.
+		"""
+        self.client.force_authenticate(user=self.user1)
+        url = '/movies/profiles/me/'
 
+		# Upload photo
+        test_image = SimpleUploadedFile(
+            "avatar.jpg", b"file_content", content_type="image/jpeg"
+        )
 
+        response = self.client.patch(
+            url,
+            data={},
+            files={'photo': test_image},
+            format='multipart'
+        )
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user1.profile.refresh_from_db()
+        self.assertIsNotNone(self.user1.profile.photo)
 
+    def test_existing_photo_is_replaced_when_uploading_new_one(self):
+        """
+        Tests uploading a new photo replaces the old image file.
+        """
+        self.client.force_authenticate(user=self.user1)
+        url = '/movies/profiles/me/'
+
+        # Upload first photo
+        first_image = SimpleUploadedFile(
+            'initial.jpg', b'first', content_type='image/jpeg'
+        )
+        self.client.patch(
+            url,
+            data={},
+            files={'photo': first_image},
+            format='multipart'
+        )
+        old_path = self.user1.profile.photo.name
+
+        # Upload second photo
+        second_image = SimpleUploadedFile(
+            'new.jpg', b'second', content_type='image/jpeg'
+        )
+        response = self.client.patch(
+            url,
+            data={},
+            files={'photo': second_image},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.user1.profile.refresh_from_db()
+        new_path = self.user1.profile.photo.name
+
+        self.assertNotEqual(old_path, new_path)
+        self.assertIsNotNone(self.user1.profile.photo)
+
+    def test_user_can_remove_photo(self):
+        """
+        Test if remove_photo=true is sent, existing photo should be deleted.
+        """
+
+        self.client.force_authenticate(user=self.user1)
+        url = '/movies/profiles/me/'
+
+        # Upload photo
+        test_image = SimpleUploadedFile(
+            "avatar.jpg", b"file_content", content_type="image/jpeg"
+        )
+        
+        self.client.patch(
+            url,
+            data={},
+            files={'photo': test_image},
+            format='multipart'
+        )
+        self.assertIsNotNone(self.user1.profile.photo)
+
+        # Remove photo
+        response = self.client.patch(
+            url, 
+        	data={'remove_photo': 'true'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.user1.profile.refresh_from_db()
+        self.assertFalse(bool(self.user1.profile.photo))
