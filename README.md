@@ -33,6 +33,7 @@ python manage.py load_movies_enriched --copy-images
 
 ### Inicia el backend
 ```
+set DEBUG=True
 python manage.py runserver
 ```
 
