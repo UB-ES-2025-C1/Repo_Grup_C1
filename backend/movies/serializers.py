@@ -113,6 +113,11 @@ class MovieSerializer(serializers.ModelSerializer):
     # Campo calculado para compatibilidad con el frontend
     average_rating = serializers.SerializerMethodField()
     numVotes = serializers.SerializerMethodField()
+    # Expose per-aspect averages for frontend
+    average_soundtrack = serializers.SerializerMethodField()
+    average_acting = serializers.SerializerMethodField()
+    average_cinematography = serializers.SerializerMethodField()
+    average_plot = serializers.SerializerMethodField()
 
     # Exponer géneros y actores como listas (separadas por comas en el modelo)
     genres = serializers.SerializerMethodField()
@@ -133,6 +138,10 @@ class MovieSerializer(serializers.ModelSerializer):
             'genres',
             'actors',
             'average_rating',
+            'average_soundtrack',
+            'average_acting',
+            'average_cinematography',
+            'average_plot',
             'numVotes',
         ]
 
@@ -184,6 +193,47 @@ class MovieSerializer(serializers.ModelSerializer):
             return count
         return 0 if obj.ratings.count() == 0 else obj.ratings.count()
 
+    def get_average_soundtrack(self, obj):
+        val = getattr(obj, 'average_soundtrack', None)
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except Exception:
+                pass
+        # fallback to compute
+        agg = obj.ratings.aggregate(Avg('soundtrack')).get('soundtrack__avg')
+        return round(agg, 1) if agg is not None else 0
+
+    def get_average_acting(self, obj):
+        val = getattr(obj, 'average_acting', None)
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except Exception:
+                pass
+        agg = obj.ratings.aggregate(Avg('acting')).get('acting__avg')
+        return round(agg, 1) if agg is not None else 0
+
+    def get_average_cinematography(self, obj):
+        val = getattr(obj, 'average_cinematography', None)
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except Exception:
+                pass
+        agg = obj.ratings.aggregate(Avg('cinematography')).get('cinematography__avg')
+        return round(agg, 1) if agg is not None else 0
+
+    def get_average_plot(self, obj):
+        val = getattr(obj, 'average_plot', None)
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except Exception:
+                pass
+        agg = obj.ratings.aggregate(Avg('plot')).get('plot__avg')
+        return round(agg, 1) if agg is not None else 0
+
 
 class MovieMiniSerializer(serializers.ModelSerializer):
     '''
@@ -199,6 +249,10 @@ class RatingSerializer(serializers.ModelSerializer):
     movie = serializers.CharField(write_only=True)
     # Expose movie info on reads
     movie_info = MovieMiniSerializer(source='movie', read_only=True)
+    # Expose the username of the rating author for display purposes
+    username = serializers.CharField(source='user.username', read_only=True)
+    # Provide a minimal 'user' object for frontend components that expect `rating.user.username`
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = Rating
@@ -206,13 +260,35 @@ class RatingSerializer(serializers.ModelSerializer):
             'id',
             'movie',
             'movie_info',
+            'username',
+            'user',
             'overall_score',
             'soundtrack',
             'acting',
             'cinematography',
             'plot',
             'comment',
+            'date',
         ]
+
+    def get_user(self, obj):
+        if obj.user is None:
+            return None
+        # Attempt to include the profile photo URL (relative or absolute)
+        photo_url = None
+        try:
+            profile = getattr(obj.user, 'profile', None)
+            if profile and getattr(profile, 'photo'):
+                # ImageField may provide a .url attribute
+                photo_url = getattr(profile.photo, 'url', None)
+        except Exception:
+            photo_url = None
+
+        return {
+            'username': getattr(obj.user, 'username', None),
+            'id': getattr(obj.user, 'id', None),
+            'photo': photo_url,
+        }
 
     def validate_overall_score(self, value):
         if value < 0 or value > 10:

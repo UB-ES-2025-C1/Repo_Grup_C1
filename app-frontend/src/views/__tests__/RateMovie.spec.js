@@ -21,10 +21,12 @@ vi.mock('@/utils/api', () => ({
 
 // Mock vue-router: useRouter (para router.push)
 const pushMock = vi.fn()
+const replaceMock = vi.fn()
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
     push: pushMock
+    , replace: replaceMock
   })
 }))
 
@@ -59,6 +61,7 @@ const mountRateMovie = async (options = {}) => {
   axios.get.mockReset()
   axios.post.mockReset()
   pushMock.mockReset()
+  replaceMock.mockReset()
   localStorage.clear()
 
   if (hasToken) {
@@ -131,8 +134,8 @@ describe('RateMovie', () => {
 
     await flushPromises()
 
-    // Debe haber intentado redirigir al login
-    expect(pushMock).toHaveBeenCalledWith({ name: 'login' })
+    // Debe haber intentado redirigir al login (se usa router.replace)
+    expect(replaceMock).toHaveBeenCalledWith({ name: 'login' })
   })
 
   it('carga título de la película y rating existente cuando hay token', async () => {
@@ -243,12 +246,13 @@ describe('RateMovie', () => {
 
     localStorage.removeItem('access')
     pushMock.mockReset()
+    replaceMock.mockReset()
     axios.post.mockReset()
 
     await wrapper.vm.submitRating()
     await flushPromises()
 
-    expect(pushMock).toHaveBeenCalledWith({ name: 'login' })
+    expect(replaceMock).toHaveBeenCalledWith({ name: 'login' })
     expect(axios.post).not.toHaveBeenCalled()
   })
 })

@@ -98,9 +98,9 @@ onMounted(async () => {
     const token = getAccessToken();
     console.log('Access token:', token);
     if (!token) {
-      // Not authenticated - redirect to login
+      // Not authenticated - redirect to login and replace history so back returns to movie page
       console.log('No access token found');
-      router.push({ name: 'login' });
+      router.replace({ name: 'login' });
       return;
     }
 
@@ -135,7 +135,7 @@ async function submitRating() {
 
   const token = getAccessToken();
   if (!token) {
-    router.push({ name: 'login' });
+    router.replace({ name: 'login' });
     return;
   }
 
@@ -176,7 +176,7 @@ async function deleteComment() {
 
   const token = getAccessToken();
   if (!token) {
-    router.push({ name: 'login' });
+    router.replace({ name: 'login' });
     return;
   }
 

@@ -108,6 +108,8 @@ class Movie(models.Model):
 class Rating(models.Model):
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='ratings')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # Fecha de creación del rating (autoestablecida al crear)
+    date = models.DateTimeField(auto_now_add=True)
     # Valoración general (0-10)
     overall_score = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
 
