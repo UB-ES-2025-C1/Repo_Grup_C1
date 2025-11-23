@@ -26,12 +26,12 @@
       </div>
 
       <!-- EDICIÓN DEL PERFIL -->
-      <div v-if="isOwnProfile" style="margin-top:1rem">
+      <div v-if="isOwnProfile" style="margin-top:1rem; margin-bottom:2rem;">
         <button @click="editing = !editing" id="edit-profile-btn">
           Edit profile
         </button>
       </div>
-      <div v-if="editing" class="edit-form">
+      <div v-if="editing" class="edit-form" style="margin-bottom:2rem;">
         <h3>Edit profile</h3>
 
         <div class="form">
@@ -64,20 +64,25 @@
         <div v-else-if="errorUpdating" style="color:red">{{ errorUpdating }}</div>
       </div>
 
-      <hr>
-
       <!-- ÚLTIMAS PELÍCULAS VALORADAS -->
       <div class="latest-ratings">
         <h2>Latest ratings</h2>
 
         <div v-if="ratedMovies.length === 0">
-          This user has not yet rated a movie.
+          <p style="color:var(--muted)"> This user has not yet rated a movie. </p>
         </div>
 
         <div class="grid">
-          <div v-for="rating in ratedMovies" :key="rating.id">
+          <div v-for="rating in displayedRatings" :key="rating.id">
             <RatingCard :rating="rating" />
           </div>
+        </div>
+
+        <!-- Pagination controls -->
+        <div v-if="totalPages > 1" class="pagination" style="margin-top:1rem; display:flex; gap:.5rem; align-items:center;">
+          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1">‹</button>
+          <button v-for="n in totalPages" :key="n" @click="goToPage(n)" :class="{ active: n === currentPage }">{{ n }}</button>
+          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages">›</button>
         </div>
       </div>
 
@@ -107,6 +112,20 @@ const avatarUrl = ref(null);
 const bio = ref(null);
 const averageRating = ref(null);
 const ratedMovies = ref([]);
+// client-side pagination
+const ratedMoviesAll = ref([]);
+const pageSize = 6;
+const currentPage = ref(1);
+const totalPages = computed(() => Math.max(1, Math.ceil(ratedMoviesAll.value.length / pageSize)));
+const displayedRatings = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return ratedMoviesAll.value.slice(start, start + pageSize);
+});
+
+function goToPage(n) {
+  if (n < 1 || n > totalPages.value) return;
+  currentPage.value = n;
+}
 
 const isOwnProfile = computed(() => props.username === 'me');
 const editing = ref(false);
@@ -136,8 +155,16 @@ onMounted(async () => {
     });
 
     loading.value = false;
-    const data2 = response2.data;
-    ratedMovies.value = data2 || [];
+    const data2 = response2.data || [];
+    // sort by date descending (newest first). fallback to id desc
+    data2.sort((a, b) => {
+      const da = a?.date ? new Date(a.date).getTime() : 0;
+      const db = b?.date ? new Date(b.date).getTime() : 0;
+      if (da === db) return (b.id || 0) - (a.id || 0);
+      return db - da;
+    });
+    ratedMoviesAll.value = data2;
+    ratedMovies.value = data2; // keep for backward compat if any other code uses it
   } catch (err) {
     loading.value = false;
     if (err.response?.data?.detail) {
@@ -234,13 +261,20 @@ function cancelChanges() {
   width: 300px;
   height: 300px;
   overflow: hidden;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .avatar img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  border-radius: 12px;
+  object-fit: cover;
+  display: block;
+  border-radius: 0; /* parent already rounded */
+}
+
+.info {
+  margin-left: 2rem;
 }
 
 .info h1 {
@@ -289,5 +323,38 @@ function cancelChanges() {
 button.disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Pagination styles */
+.pagination button {
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: var(--card);
+  cursor: pointer;
+}
+.pagination button.active {
+  background: var(--primary);
+  color: white;
+  font-weight: 700;
+}
+.pagination button:disabled { opacity: 0.4; cursor: default }
+
+.latest-ratings {
+  margin-top: 2rem;
+  margin-bottom: 4rem;
+}
+/* Grid layout for latest ratings: 1 column on small, 3 columns on wider screens
+   (with pageSize=6 this yields 2 rows of 3 items) */
+.latest-ratings .grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 720px) {
+  .latest-ratings .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 </style>
