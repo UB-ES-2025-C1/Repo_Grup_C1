@@ -98,3 +98,49 @@ npm test
 #Generar carpeta coverage de los unit tests en frontend:
 npm install
 npm run test:coverage
+
+
+### Testing con Cypress (BEHAVIOUR DRIVEN DEVELOPMENT)
+
+El proyecto incluye tests end-to-end (E2E) con Cypress para probar el flujo completo de la aplicación.
+
+#### Requisitos previos
+
+Asegúrate de que el backend y el frontend estén ejecutándose antes de correr los tests:
+
+1. **Backend**: Debe estar corriendo en `http://127.0.0.1:8000` (o la URL configurada en `VITE_API_BASE_URL`)
+2. **Frontend**: Debe estar corriendo en `http://localhost:5173` (puerto por defecto de Vite)
+
+#### Ejecutar los tests de Cypress
+
+**Opción 1: Interfaz gráfica de Cypress (recomendado para desarrollo)**
+
+Abre la interfaz interactiva de Cypress donde puedes ver los tests ejecutándose en tiempo real:
+
+```bash
+# Desde el directorio app-frontend
+npm run cypress:open
+```
+
+Esto abrirá la aplicación de Cypress donde podrás:
+- Ver todos los tests disponibles
+- Ejecutar tests individuales o todos a la vez
+- Ver la ejecución en tiempo real en un navegador
+- Depurar tests fácilmente
+
+#### Estructura de los tests
+
+Los tests E2E se encuentran en `app-frontend/cypress/e2e/`:
+
+- `home.cy.js` - Tests del catálogo de películas
+- `login.cy.js` - Tests de autenticación
+- `register.cy.js` - Tests de registro de usuarios
+- `movie-info.cy.js` - Tests de detalle de película
+- `rate-movie.cy.js` - Tests de valoración de películas
+
+#### Configuración
+
+La configuración de Cypress se encuentra en `app-frontend/cypress.config.js`:
+
+- `baseUrl`: Configurado para `http://localhost:5173` (puerto por defecto de Vite)
+- Los intercepts de las peticiones API se configuran en cada test individual
