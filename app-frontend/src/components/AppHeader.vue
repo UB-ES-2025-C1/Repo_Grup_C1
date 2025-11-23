@@ -36,7 +36,7 @@
 
 <script setup>
 import defaultAvatar from '@/assets/default-avatar.webp';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { withApiBase } from '@/utils/api';
 
@@ -71,8 +71,25 @@ onMounted(async () => {
         console.error('Error loading user info', e);
       }
     }
-  }
-})
+    }
+  });
+
+  // Listen for profile updates in the same tab (ProfileView dispatches this)
+  const onProfileUpdated = (ev) => {
+    try {
+      const photo = ev && ev.detail && ev.detail.photo;
+      const name = ev && ev.detail && ev.detail.username;
+      if (photo) {
+        avatarUrl.value = photo;
+        localStorage.setItem('avatarUrl', photo);
+      }
+      if (name) username.value = name;
+    } catch (e) {
+      // ignore
+    }
+  };
+  window.addEventListener('profile-updated', onProfileUpdated);
+  onUnmounted(() => window.removeEventListener('profile-updated', onProfileUpdated));
 </script>
 
 <style scoped>

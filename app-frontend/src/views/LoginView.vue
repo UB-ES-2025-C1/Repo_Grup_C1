@@ -6,9 +6,9 @@
   </AppHeader>
   <main class="container auth">
     <section class="authCard">
-      <h1 style="margin:0 0 .5rem">Log in</h1>
       <div v-if="isLoggedIn">
-        <p style="color:#94a3b8; margin:0 0 1rem">You are already logged in.</p>
+        <h1 style="margin:0 0 .5rem">Log out</h1>
+        <p style="color:#94a3b8; margin:0 0 1rem">You are now logged in.</p>
 
         <p style="color:#94a3b8; margin:0 0 1rem">Would you like to log out?</p>
 
@@ -23,6 +23,7 @@
         </p>
       </div>
       <div v-else>
+        <h1 style="margin:0 0 .5rem">Log in</h1>
         <p style="color:#94a3b8; margin:0 0 1rem">Welcome back! Please log in to your account.</p>
 
         <form @submit.prevent="login" style="display:grid;gap:.75rem">

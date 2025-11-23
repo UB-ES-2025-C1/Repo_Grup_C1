@@ -138,7 +138,7 @@ describe('MovieInfo', () => {
     expect(text).toContain('A test movie description.')
 
     // Rating y votos
-    expect(text).toContain('Rating:')
+    expect(text).toContain('Overall rating:')
     expect(text).toContain('8.5')
     // numVotes.toLocaleString() -> depende del locale, pero debería incluir "1,234" o "1234"
     expect(text.replace(/[.,]/g, '')).toContain('1234')
@@ -171,8 +171,8 @@ describe('MovieInfo', () => {
     const button = wrapper.get('button.primary')
     expect(button.text()).toBe('Rate')
 
-    // Con este escenario solo se debe haber llamado una vez (detalle de película)
-    expect(axios.get).toHaveBeenCalledTimes(1)
+    // Con este escenario solo se debe haber llamado dos veces (detalle de película + public comments)
+    expect(axios.get).toHaveBeenCalledTimes(2)
   })
 
   it('muestra el rating del usuario y el botón "Change Rating" si hay token y rating', async () => {
@@ -187,8 +187,7 @@ describe('MovieInfo', () => {
     expect(preview.exists()).toBe(true)
 
     const text = preview.text()
-    expect(text).toContain('Your rating')
-    expect(text).toContain('Overall: 9')
+    expect(text).toContain('9')
     expect(text).toContain('Soundtrack: 8')
     expect(text).toContain('Acting: 9')
     expect(text).toContain('Cinematography: 10')
@@ -206,8 +205,8 @@ describe('MovieInfo', () => {
     expect(deleteRatingBtn).toBeTruthy()
     expect(deleteCommentBtn).toBeTruthy()
 
-    // Debe haberse llamado 2 veces: detalle + rating
-    expect(axios.get).toHaveBeenCalledTimes(2)
+    // Debe haberse llamado 3 veces: detalle + rating + public comments
+    expect(axios.get).toHaveBeenCalledTimes(3)
   })
 
   it('si hay token pero la API devuelve 404 de rating, se comporta como no valorada', async () => {
@@ -225,7 +224,111 @@ describe('MovieInfo', () => {
     const button = wrapper.get('button.primary')
     expect(button.text()).toBe('Rate')
 
-    // Aun así se llama a ambas APIs
-    expect(axios.get).toHaveBeenCalledTimes(2)
+    // Aun así se llama a las APIs: detalle + rating (404) + public comments
+    expect(axios.get).toHaveBeenCalledTimes(3)
+  })
+
+  it('muestra solo las valoraciones que contienen comentario (filtra vacíos)', async () => {
+    // Preparamos comentarios mixtos (algunos sin comment)
+    const commentsResp = [
+      { id: 1, overall_score: 7, comment: 'Nice', date: '2025-11-01T10:00:00Z' },
+      { id: 2, overall_score: 6, comment: '', date: '2025-11-02T11:00:00Z' },
+      { id: 3, overall_score: 8, comment: 'Another', date: '2025-11-03T12:00:00Z' }
+    ]
+
+    // Mock axios.get to return movie detail and the comments
+    axios.get.mockImplementation(async (url) => {
+      if (url === 'http://api.test/movies/tt123/') return { data: sampleMovie }
+      if (url === 'http://api.test/movies/tt123/ratings/') return { data: commentsResp }
+      // other endpoints (user rating) should not be called in this scenario
+      return { data: {} }
+    })
+
+    const wrapper = mount(MovieInfo, {
+      props: { tconst: 'tt123' },
+      global: { stubs: { 'router-link': { template: '<a><slot /></a>' } } }
+    })
+
+    await flushPromises()
+
+    // Solo se deben renderizar 2 comentarios (los no vacíos)
+    const cards = wrapper.findAll('.comments-list .user-rating-card')
+    expect(cards.length).toBe(2)
+
+    // Orden: newest first -> 'Another' (2025-11-03) then 'Nice' (2025-11-01)
+    expect(cards[0].text()).toContain('Another')
+    expect(cards[1].text()).toContain('Nice')
+  })
+
+  it('ordena los comentarios por fecha (más recientes primero)', async () => {
+    const commentsResp = [
+      { id: 10, overall_score: 5, comment: 'Old', date: '2025-11-01T00:00:00Z' },
+      { id: 11, overall_score: 8, comment: 'Newest', date: '2025-11-05T00:00:00Z' },
+      { id: 12, overall_score: 7, comment: 'Mid', date: '2025-11-03T00:00:00Z' }
+    ]
+
+    axios.get.mockImplementation(async (url) => {
+      if (url === 'http://api.test/movies/tt123/') return { data: sampleMovie }
+      if (url === 'http://api.test/movies/tt123/ratings/') return { data: commentsResp }
+      return { data: {} }
+    })
+
+    const wrapper = mount(MovieInfo, {
+      props: { tconst: 'tt123' },
+      global: { stubs: { 'router-link': { template: '<a><slot /></a>' } } }
+    })
+
+    await flushPromises()
+
+    const cards = wrapper.findAll('.comments-list .user-rating-card')
+    expect(cards.length).toBe(3)
+    // Expect order: Newest, Mid, Old
+    expect(cards[0].text()).toContain('Newest')
+    expect(cards[1].text()).toContain('Mid')
+    expect(cards[2].text()).toContain('Old')
+  })
+
+  it('pagina los comentarios mostrando solo `pageSize` por página y permite navegar', async () => {
+    // Create 12 comments with non-empty comments
+    const commentsResp = Array.from({ length: 12 }).map((_, i) => ({
+      id: i + 1,
+      overall_score: 6 + (i % 5),
+      comment: `Comment ${i + 1}`,
+      // newer items have larger timestamps
+      date: new Date(Date.UTC(2025, 10, 30 - i)).toISOString()
+    }))
+
+    axios.get.mockImplementation(async (url) => {
+      if (url === 'http://api.test/movies/tt123/') return { data: sampleMovie }
+      if (url === 'http://api.test/movies/tt123/ratings/') return { data: commentsResp }
+      return { data: {} }
+    })
+
+    const wrapper = mount(MovieInfo, {
+      props: { tconst: 'tt123' },
+      global: { stubs: { 'router-link': { template: '<a><slot /></a>' } } }
+    })
+
+    await flushPromises()
+
+    // pageSize is 10, so first page shows 10 items
+    let cards = wrapper.findAll('.comments-list .user-rating-card')
+    expect(cards.length).toBe(10)
+
+    // Pagination controls should be present and have 2 pages
+    const pagination = wrapper.find('.comments-section .pagination')
+    expect(pagination.exists()).toBe(true)
+    // Click page 2
+    const pageButtons = pagination.findAll('button')
+    const page2 = pageButtons.find(b => b.text() === '2')
+    expect(page2).toBeTruthy()
+    await page2.trigger('click')
+    await flushPromises()
+
+    // Now the second page should show the remaining 2 items
+    cards = wrapper.findAll('.comments-list .user-rating-card')
+    expect(cards.length).toBe(2)
+    expect(cards[0].text()).toContain('Comment 11')
+    expect(cards[1].text()).toContain('Comment 12')
   })
 })
