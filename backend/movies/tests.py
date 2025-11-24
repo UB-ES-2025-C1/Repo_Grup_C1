@@ -512,3 +512,49 @@ class TestProfileAPI(APITestCase):
 
         self.user1.profile.refresh_from_db()
         self.assertFalse(bool(self.user1.profile.photo))
+
+class TestUserSearchAPI(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.u1 = User.objects.create_user(username='Aaron', email='a1@test.com', password='pw')
+        self.u2 = User.objects.create_user(username='Bea', email='b2@test.com', password='pw')
+        self.u3 = User.objects.create_user(username='Charlie', email='c3@test.com', password='pw')
+        for u in [self.u1, self.u2, self.u3]:
+            self.assertTrue(hasattr(u, 'profile'))
+
+    def test_get_all_users_no_query(self):
+        url = '/api/users/'
+        resp = self.client.get(url, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 3)
+
+        # Ajustado a la estructura plana
+        usernames = [item['username'] for item in resp.data]
+        self.assertCountEqual(usernames, ['Aaron', 'Bea', 'Charlie'])
+
+    def test_get_all_users_with_query(self):
+        url = '/api/users/?q=ar'
+        resp = self.client.get(url, format='json')
+        self.assertEqual(resp.status_code, 200)
+
+        usernames = [item['username'] for item in resp.data]
+        # "Aaron" y "Charlie" contienen "ar" (case-insensitive)
+        self.assertCountEqual(usernames, ['Aaron', 'Charlie'])
+
+    def test_get_all_users_empty_result(self):
+        url = '/api/users/?q=zzz'
+        resp = self.client.get(url, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 0)
+
+    def test_response_structure(self):
+        url = '/api/users/'
+        resp = self.client.get(url, format='json')
+        self.assertEqual(resp.status_code, 200)
+        for item in resp.data:
+            # Ahora comprobamos la estructura real
+            self.assertIn('username', item)
+            self.assertIn('bio', item)
+            self.assertIn('photo', item)
+            self.assertIn('average_rating', item)
+            
