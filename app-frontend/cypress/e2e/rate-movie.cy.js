@@ -50,6 +50,15 @@ describe('RateMovie - valoración de una película', () => {
       body: {},
     }).as('getRating404')
 
+    // Mock del perfil del usuario (AppHeader hace esta petición cuando está logueado)
+    cy.intercept('GET', '**/movies/profiles/me/', {
+      statusCode: 200,
+      body: {
+        username: 'testuser',
+        photo: '/media/profile_photos/user_1.jpg',
+      },
+    }).as('getProfile')
+
     cy.visit(`/movie/${tconst}/rate`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('access', 'fake-token')
@@ -86,6 +95,15 @@ describe('RateMovie - valoración de una película', () => {
       statusCode: 500,
       body: {},
     }).as('getMovieError')
+
+    // Mock del perfil del usuario (AppHeader hace esta petición cuando está logueado)
+    cy.intercept('GET', '**/movies/profiles/me/', {
+      statusCode: 200,
+      body: {
+        username: 'testuser',
+        photo: '/media/profile_photos/user_1.jpg',
+      },
+    }).as('getProfile')
 
     cy.visit(`/movie/${tconst}/rate`, {
       onBeforeLoad(win) {

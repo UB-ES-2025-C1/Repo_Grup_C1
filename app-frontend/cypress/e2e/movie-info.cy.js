@@ -14,6 +14,7 @@ describe('Movie detail - MovieInfo', () => {
   }
 
   const userRating = {
+    id: 1,
     movie: tconst,
     overall_score: 9,
     soundtrack: 9,
@@ -21,6 +22,11 @@ describe('Movie detail - MovieInfo', () => {
     cinematography: 10,
     plot: 9,
     comment: 'Amazing movie!',
+    user: {
+      username: 'testuser',
+      id: 1,
+      photo: '/media/profile_photos/user_1.jpg',
+    },
   }
 
   it('muestra los detalles de la película cuando la carga tiene éxito y el usuario no tiene rating', () => {
@@ -45,12 +51,13 @@ describe('Movie detail - MovieInfo', () => {
     // Comprueba que se ve el título, el año y datos básicos
     cy.contains(movie.primaryTitle).should('be.visible')
     cy.contains(`(${movie.startYear})`).should('be.visible')
-    cy.contains('Rating:').should('be.visible')
+    cy.contains('Overall rating:').should('be.visible')
     cy.contains(movie.average_rating.toString()).should('be.visible')
     cy.contains(movie.numVotes.toLocaleString()).should('be.visible')
 
-    // No debería aparecer el bloque de "Your rating"
-    cy.contains('Your rating').should('not.exist')
+    // El título "Your rating" siempre está visible, pero no debería aparecer el contenido del rating
+    cy.contains('Your rating').should('be.visible')
+    cy.contains("You haven't rated this movie yet.").should('be.visible')
     cy.contains('Delete rating').should('not.exist')
     cy.contains('Delete comment').should('not.exist')
 
@@ -71,6 +78,21 @@ describe('Movie detail - MovieInfo', () => {
       body: userRating,
     }).as('getUserRating')
 
+    // Mock del perfil del usuario (AppHeader hace esta petición cuando está logueado)
+    cy.intercept('GET', '**/movies/profiles/me/', {
+      statusCode: 200,
+      body: {
+        username: 'testuser',
+        photo: '/media/profile_photos/user_1.jpg',
+      },
+    }).as('getProfile')
+
+    // Mock de ratings públicos (el componente también hace esta petición)
+    cy.intercept('GET', '**/movies/tt0120737/ratings/', {
+      statusCode: 200,
+      body: [],
+    }).as('getPublicRatings')
+
     // Simulamos que el usuario está logueado (token en localStorage)
     cy.visit(`/movie/${tconst}`, {
       onBeforeLoad(win) {
@@ -83,8 +105,10 @@ describe('Movie detail - MovieInfo', () => {
 
     // Bloque de rating del usuario visible
     cy.contains('Your rating').should('be.visible')
-    cy.contains(`Overall: ${userRating.overall_score}`).should('be.visible')
-    cy.contains(userRating.comment).should('be.visible')
+    // El CommentCard muestra el overall_score como número, no como "Overall: 9"
+    cy.get('.user-rating-card .overall').should('contain', userRating.overall_score.toString())
+    // El comentario se muestra entre comillas
+    cy.contains(`"${userRating.comment}"`).should('be.visible')
 
     // Botón de cambiar rating + borrar rating/comentario
     cy.contains('Change rating').should('be.visible')
