@@ -228,7 +228,7 @@ const saveChanges = async () => {
     const data = response.data;
     console.log(data);
     bio.value = data.bio;
-    avatarUrl.value = resolvePhotoSrc(data.photo);
+    avatarUrl.value = resolvePhotoSrc(data.photo_url);
     newBio.value = bio.value || '';
     newAvatar.value.value = null;
     newAvatarFile.value = null;
