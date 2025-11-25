@@ -13,7 +13,12 @@ RUN pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir
 
 COPY . .
 
+# Copiar y hacer ejecutable el script de entrada
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Si uses Whitenoise per estàtics, pots fer:
 # RUN python manage.py collectstatic --noinput
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "cinemaub.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "90"]

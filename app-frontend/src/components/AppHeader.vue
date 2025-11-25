@@ -81,7 +81,7 @@ const onProfileUpdated = (ev) => {
     const photo = ev && ev.detail && ev.detail.photo;
     const name = ev && ev.detail && ev.detail.username;
     if (photo) {
-      avatarUrl.value = photo;
+      avatarUrl.value = resolvePhotoSrc(photo);
       localStorage.setItem('avatarUrl', photo);
     }
     if (name) username.value = name;
