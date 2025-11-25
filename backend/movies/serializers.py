@@ -355,12 +355,12 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
     # Used by the user to delete their profile photo
     remove_photo = serializers.BooleanField(write_only=True, required=False, default=False)
     
-    photo = serializers.SerializerMethodField()
+    photo_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Profile
         # We only include the fields that the user can edit
-        fields = ['bio', 'photo', 'remove_photo']
+        fields = ['bio', 'photo', 'photo_url', 'remove_photo']
 
     def update(self, instance, validated_data):
         # If remove_photo is True, we remove the photo
@@ -371,7 +371,7 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
     
-    def get_photo(self, obj):
+    def get_photo_url(self, obj):
         if obj.photo:
             try:
                 return obj.photo.url  # Esto devuelve '/media/...'
