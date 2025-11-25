@@ -55,7 +55,7 @@ try {
 onMounted(async () => {
   if (isLoggedIn.value) {
     username.value = localStorage.getItem('username');
-    avatarUrl.value = localStorage.getItem('avatarUrl');
+    avatarUrl.value = resolvePhotoSrc(localStorage.getItem('avatarUrl'));
 
     if (!username.value || !avatarUrl.value) {
       try {
@@ -64,10 +64,10 @@ onMounted(async () => {
         
         const data = response.data;
         username.value = data.username;
-        avatarUrl.value = data.photo;
+        avatarUrl.value = resolvePhotoSrc(data.photo);
         
         localStorage.setItem('username', username.value);
-        localStorage.setItem('avatarUrl', avatarUrl.value);
+        localStorage.setItem('avatarUrl', data.photo);
       } catch (e) {
         console.error('Error loading user info', e);
       }
@@ -92,6 +92,17 @@ const onProfileUpdated = (ev) => {
 
 window.addEventListener('profile-updated', onProfileUpdated);
 onUnmounted(() => window.removeEventListener('profile-updated', onProfileUpdated));
+
+// Compute avatar src robustly: prefer rating.user.photo when provided by API.
+function resolvePhotoSrc(photo) {
+  if (!photo) return defaultAvatar;
+  // If it's already absolute, use as-is
+  if (/^https?:\/\//i.test(photo)) return photo;
+  // If it starts with '/', assume it's a path served by the API (use withApiBase to make full URL)
+  if (photo.startsWith('/')) return withApiBase(photo);
+  // otherwise return as-is
+  return photo;
+}
 </script>
 
 <style scoped>
