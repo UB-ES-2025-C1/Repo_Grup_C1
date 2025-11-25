@@ -55,15 +55,17 @@ try {
 onMounted(async () => {
   if (isLoggedIn.value) {
     username.value = localStorage.getItem('username');
-    avatarUrl.value = localStorage.getItem('avatarUrl') || defaultAvatar;
+    avatarUrl.value = localStorage.getItem('avatarUrl');
+    avatarUrl.value = resolvePhotoSrc(avatarUrl.value);
 
     if (!username.value || !avatarUrl.value) {
       try {
+        console.log(withApiBase('/movies/profiles/me/'));
         const response = await axios.get(withApiBase('/movies/profiles/me/'));
         
         const data = response.data;
         username.value = data.username;
-        avatarUrl.value = data.photo || defaultAvatar;
+        avatarUrl.value = resolvePhotoSrc(data.photo);
         
         localStorage.setItem('username', username.value);
         localStorage.setItem('avatarUrl', avatarUrl.value);
@@ -71,25 +73,36 @@ onMounted(async () => {
         console.error('Error loading user info', e);
       }
     }
-    }
-  });
+  }
+});
 
-  // Listen for profile updates in the same tab (ProfileView dispatches this)
-  const onProfileUpdated = (ev) => {
-    try {
-      const photo = ev && ev.detail && ev.detail.photo;
-      const name = ev && ev.detail && ev.detail.username;
-      if (photo) {
-        avatarUrl.value = photo;
-        localStorage.setItem('avatarUrl', photo);
-      }
-      if (name) username.value = name;
-    } catch (e) {
-      // ignore
+// Listen for profile updates in the same tab (ProfileView dispatches this)
+const onProfileUpdated = (ev) => {
+  try {
+    const photo = ev && ev.detail && ev.detail.photo;
+    const name = ev && ev.detail && ev.detail.username;
+    if (photo) {
+      avatarUrl.value = photo;
+      localStorage.setItem('avatarUrl', photo);
     }
-  };
-  window.addEventListener('profile-updated', onProfileUpdated);
-  onUnmounted(() => window.removeEventListener('profile-updated', onProfileUpdated));
+    if (name) username.value = name;
+  } catch (e) {
+    // ignore
+  }
+};
+
+window.addEventListener('profile-updated', onProfileUpdated);
+onUnmounted(() => window.removeEventListener('profile-updated', onProfileUpdated));
+
+function resolvePhotoSrc(photo) {
+  if (!photo) return defaultAvatar;
+  // If it's already absolute, use as-is
+  if (/^https?:\/\//i.test(photo)) return photo;
+  // If it starts with '/', assume it's a path served by the API (use withApiBase to make full URL)
+  if (photo.startsWith('/')) return withApiBase(photo);
+  // otherwise return as-is
+  return photo;
+}
 </script>
 
 <style scoped>
