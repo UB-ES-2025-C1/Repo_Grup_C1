@@ -11,3 +11,7 @@ __pycache__/
 
 backend/htmlcov/
 backend/venv-locust/
+
+# Database
+backend/db.sqlite3
+*.sqlite3

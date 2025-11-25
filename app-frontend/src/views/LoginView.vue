@@ -6,17 +6,24 @@
   </AppHeader>
   <main class="container auth">
     <section class="authCard">
-      <h1 style="margin:0 0 .5rem">Log in</h1>
       <div v-if="isLoggedIn">
-        <p style="color:#94a3b8; margin:0 0 1rem">You are already logged in.</p>
+        <h1 style="margin:0 0 .5rem">Log out</h1>
+        <p style="color:#94a3b8; margin:0 0 1rem">You are now logged in.</p>
 
         <p style="color:#94a3b8; margin:0 0 1rem">Would you like to log out?</p>
 
         <form @submit.prevent="logout" style="display:grid;gap:.75rem">
           <button type="submit" style="background-color:#f1807e">Log out</button>
         </form>
+        <p style="color:#94a3b8; margin-top:1rem; text-align:center">
+          Are you lost?
+          <router-link to="/" style="color:#3b82f6; text-decoration:none; font-weight:500;">
+            Go Home
+          </router-link>
+        </p>
       </div>
       <div v-else>
+        <h1 style="margin:0 0 .5rem">Log in</h1>
         <p style="color:#94a3b8; margin:0 0 1rem">Welcome back! Please log in to your account.</p>
 
         <form @submit.prevent="login" style="display:grid;gap:.75rem">
@@ -67,17 +74,29 @@ const login = async () => {
     });
 
     // Si el backend devuelve access y data es correcto
-    loading.value = false;
     const data = response.data;
     localStorage.setItem('access', data.access);
     localStorage.setItem('refresh', data.refresh);
 
-    // Recuperar la última ruta guardada
-    let redirect = null
+    // Obtener la información del perfil de usuario para el header
     try {
-      redirect = sessionStorage.getItem('lastPath')
+      const response2 = await axios.get(withApiBase('/movies/profiles/me/'));
+      
+      const data2 = response2.data;
+      localStorage.setItem('username', username.value);
+      localStorage.setItem('avatarUrl', avatarUrl.value);
     } catch (e) {
-      redirect = null
+      console.error('Error loading user info', e);
+    }
+
+    loading.value = false;
+
+    // Recuperar la última ruta guardada
+    let redirect = null;
+    try {
+      redirect = sessionStorage.getItem('lastPath');
+    } catch (e) {
+      redirect = null;
     }
 
     // Validaciones de seguridad: debe ser ruta interna y no ser /login o /register
@@ -107,8 +126,10 @@ const login = async () => {
 
 const logout = async () => {
   try {
-    localStorage.removeItem('access')
-    localStorage.removeItem('refresh')
+    localStorage.removeItem('access');
+    localStorage.removeItem('refresh');
+    localStorage.removeItem('username');
+    localStorage.removeItem('avatarUrl');
 
     // Volver a la pagina de inicio
     router.push('/');
@@ -133,4 +154,5 @@ onMounted(() => {
     isLoggedIn.value = false;
   }
 });
+
 </script>

@@ -22,17 +22,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m*-h(1%zag%9daw=(=1ggz*p%g%60dj=b!v^7@9gxag*ib5v*&'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-m*-h(1%zag%9daw=(=1ggz*p%g%60dj=b!v^7@9gxag*ib5v*&')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'cinemaub.llurbatech.com',
-    'cinemaub-beta.llurbatech.com',
-]
+# ALLOWED_HOSTS from environment variable (comma-separated) or default
+ALLOWED_HOSTS_STR = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,cinemaub.llurbatech.com,cinemaub-beta.llurbatech.com')
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STR.split(',') if host.strip()]
 
 
 # Application definition
@@ -165,13 +162,9 @@ MEDIA_URL = '/media/'
 # Ruta en el sistema de archivos donde se guardarán los archivos subidos
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Configuración de CORS
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",      # Si tu Vue app corre en localhost:5173
-    "http://127.0.0.1:5173",      # Otra posible dirección local
-    "https://cinemaub.llurbatech.com",
-    "https://cinemaub-beta.llurbatech.com",
-]
+# Configuración de CORS - leer de variable de entorno o usar defaults
+CORS_ALLOWED_ORIGINS_STR = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173,https://cinemaub.llurbatech.com,https://cinemaub-beta.llurbatech.com')
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in CORS_ALLOWED_ORIGINS_STR.split(',') if origin.strip()]
 
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", 'http://localhost:5173,http://127.0.0.1:5173,https://cinemaub.llurbatech.com').split(',')
 

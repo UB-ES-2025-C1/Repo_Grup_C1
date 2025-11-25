@@ -8,6 +8,7 @@ from django.contrib.auth import authenticate
 from .models import Rating
 from rest_framework.exceptions import ValidationError
 from axes.handlers.database import AxesDatabaseHandler
+from .models import Profile
     
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -64,6 +65,15 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
     
+    def validate_username(self, value):
+        """
+        Check that the username is not a reserved keyword like 'me'.
+        """
+        # We check "me", "Me", "ME", etc.
+        if value.lower() == 'me':
+            raise serializers.ValidationError("This username is reserved. Please choose another one.")
+        return value
+    
 
 class UserLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -103,6 +113,11 @@ class MovieSerializer(serializers.ModelSerializer):
     # Campo calculado para compatibilidad con el frontend
     average_rating = serializers.SerializerMethodField()
     numVotes = serializers.SerializerMethodField()
+    # Expose per-aspect averages for frontend
+    average_soundtrack = serializers.SerializerMethodField()
+    average_acting = serializers.SerializerMethodField()
+    average_cinematography = serializers.SerializerMethodField()
+    average_plot = serializers.SerializerMethodField()
 
     # Exponer géneros y actores como listas (separadas por comas en el modelo)
     genres = serializers.SerializerMethodField()
@@ -123,6 +138,10 @@ class MovieSerializer(serializers.ModelSerializer):
             'genres',
             'actors',
             'average_rating',
+            'average_soundtrack',
+            'average_acting',
+            'average_cinematography',
+            'average_plot',
             'numVotes',
         ]
 
@@ -174,26 +193,102 @@ class MovieSerializer(serializers.ModelSerializer):
             return count
         return 0 if obj.ratings.count() == 0 else obj.ratings.count()
 
+    def get_average_soundtrack(self, obj):
+        val = getattr(obj, 'average_soundtrack', None)
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except Exception:
+                pass
+        # fallback to compute
+        agg = obj.ratings.aggregate(Avg('soundtrack')).get('soundtrack__avg')
+        return round(agg, 1) if agg is not None else 0
+
+    def get_average_acting(self, obj):
+        val = getattr(obj, 'average_acting', None)
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except Exception:
+                pass
+        agg = obj.ratings.aggregate(Avg('acting')).get('acting__avg')
+        return round(agg, 1) if agg is not None else 0
+
+    def get_average_cinematography(self, obj):
+        val = getattr(obj, 'average_cinematography', None)
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except Exception:
+                pass
+        agg = obj.ratings.aggregate(Avg('cinematography')).get('cinematography__avg')
+        return round(agg, 1) if agg is not None else 0
+
+    def get_average_plot(self, obj):
+        val = getattr(obj, 'average_plot', None)
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except Exception:
+                pass
+        agg = obj.ratings.aggregate(Avg('plot')).get('plot__avg')
+        return round(agg, 1) if agg is not None else 0
+
+
+class MovieMiniSerializer(serializers.ModelSerializer):
+    '''
+    Mini serializer to get basic information of a movie.
+    '''
+    class Meta:
+        model = Movie
+        fields = ['tconst', 'primary_title', 'start_year', 'poster_path']
+
 
 class RatingSerializer(serializers.ModelSerializer):
     # Accept movie tconst in input (write-only). We look up the Movie in create().
     movie = serializers.CharField(write_only=True)
-    # Expose movie.tconst on reads
-    movie_tconst = serializers.CharField(source='movie.tconst', read_only=True)
+    # Expose movie info on reads
+    movie_info = MovieMiniSerializer(source='movie', read_only=True)
+    # Expose the username of the rating author for display purposes
+    username = serializers.CharField(source='user.username', read_only=True)
+    # Provide a minimal 'user' object for frontend components that expect `rating.user.username`
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = Rating
         fields = [
             'id',
             'movie',
-            'movie_tconst',
+            'movie_info',
+            'username',
+            'user',
             'overall_score',
             'soundtrack',
             'acting',
             'cinematography',
             'plot',
             'comment',
+            'date',
         ]
+
+    def get_user(self, obj):
+        if obj.user is None:
+            return None
+        # Attempt to include the profile photo URL (relative or absolute)
+        photo_url = None
+        try:
+            profile = getattr(obj.user, 'profile', None)
+            if profile and getattr(profile, 'photo'):
+                # ImageField may provide a .url attribute
+                photo_url = getattr(profile.photo, 'url', None)
+        except Exception:
+            photo_url = None
+
+        return {
+            'username': getattr(obj.user, 'username', None),
+            'id': getattr(obj.user, 'id', None),
+            'photo': photo_url,
+        }
 
     def validate_overall_score(self, value):
         if value < 0 or value > 10:
@@ -234,3 +329,52 @@ class RatingSerializer(serializers.ModelSerializer):
 
         rating = Rating.objects.create(movie=movie, user=user, **validated_data)
         return rating
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    # Get the username from the related User model
+    username = serializers.CharField(source='user.username', read_only=True)
+    
+    # The 'average_rating' field comes from the Profile model's property
+    average_rating = serializers.FloatField(read_only=True)
+
+    photo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Profile
+        fields = ['username', 'bio', 'photo', 'average_rating']
+
+    def get_photo(self, obj):
+        if obj.photo:
+            try:
+                return obj.photo.url  # Esto devuelve '/media/...'
+            except ValueError:
+                return None
+        return None
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    # Used by the user to delete their profile photo
+    remove_photo = serializers.BooleanField(write_only=True, required=False, default=False)
+    
+    photo_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Profile
+        # We only include the fields that the user can edit
+        fields = ['bio', 'photo', 'photo_url', 'remove_photo']
+
+    def update(self, instance, validated_data):
+        # If remove_photo is True, we remove the photo
+        if validated_data.pop('remove_photo', False):
+            if instance.photo:
+                instance.photo.delete(save=False)
+            instance.photo = None
+
+        return super().update(instance, validated_data)
+    
+    def get_photo_url(self, obj):
+        if obj.photo:
+            try:
+                return obj.photo.url  # Esto devuelve '/media/...'
+            except ValueError:
+                return None
+        return None

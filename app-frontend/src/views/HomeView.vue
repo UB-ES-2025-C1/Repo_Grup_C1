@@ -1,14 +1,13 @@
 <template>
   <AppHeader />
 
-
   <div class="container">
     <!-- 🔍 Barra de búsqueda -->
     <div class="search-bar">
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="Search movies..."
+        placeholder="Search movies or users..."
         class="search-input"
       />
     </div>
@@ -26,28 +25,62 @@
     <div v-if="loading" class="empty">Loading movies…</div>
     <div v-else-if="error" class="empty">⚠️ {{ error }}</div>
 
-    <!-- Catálogo de películas -->
-    <template v-else-if="filteredMovies.length > 0">
-      <div class="grid">
-        <MovieCard
-          v-for="movie in paginatedMovies"
-          :key="movie.tconst"
-          :movie="movie"
-        />
-      </div>
+    <!-- Catálogo de películas y usuarios -->
+    <template v-else>
+      <!-- 🔹 Si hay texto en la búsqueda -->
+      <template v-if="searchQuery.trim()">
+        <!-- Movies -->
+        <div v-if="filteredMovies.length">
+          <h2>Movies</h2>
+          <div class="grid">
+            <MovieCard
+              v-for="movie in paginatedMovies"
+              :key="movie.tconst"
+              :movie="movie"
+            />
+          </div>
+        </div>
 
-      <!-- Controles de paginación -->
-      <div class="pagination-controls">
-        <button @click="prevPage" :disabled="page === 1" class="ghost">Prev</button>
-        <span>
-          Page {{ page }} / {{ totalPages }} &middot;
-          Showing {{ fromIndex }}–{{ toIndex }} of {{ filteredMovies.length }}
-        </span>
-        <button @click="nextPage" :disabled="page === totalPages">Next</button>
-      </div>
+        <!-- Users -->
+        <div v-if="filteredUsers.length > 0" style="margin-top: 2rem;">
+          <h2>Users</h2>
+          <div class="grid">
+            <UserCard
+              v-for="user in filteredUsers"
+              :key="user.username"
+              :user="user"
+            />
+          </div>
+        </div>
+
+        <div v-if="!filteredMovies.length && !filteredUsers.length" class="empty">
+          No results found.
+        </div>
+      </template>
+
+      <!-- 🔹 Si no hay texto, mostramos solo películas como antes -->
+      <template v-else-if="filteredMovies.length > 0">
+        <div class="grid">
+          <MovieCard
+            v-for="movie in paginatedMovies"
+            :key="movie.tconst"
+            :movie="movie"
+          />
+        </div>
+
+        <!-- Controles de paginación -->
+        <div class="pagination-controls">
+          <button @click="prevPage" :disabled="page === 1" class="ghost">Prev</button>
+          <span>
+            Page {{ page }} / {{ totalPages }} &middot;
+            Showing {{ fromIndex }}–{{ toIndex }} of {{ filteredMovies.length }}
+          </span>
+          <button @click="nextPage" :disabled="page === totalPages">Next</button>
+        </div>
+      </template>
+
+      <div v-else class="empty">No results found.</div>
     </template>
-
-    <div v-else class="empty">No results found.</div>
   </div>
 </template>
 
@@ -57,10 +90,12 @@ import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { withApiBase } from '@/utils/api'
 import MovieCard from '@/components/MovieCard.vue'
+import UserCard from '@/components/UserCard.vue'
 import MovieFilter from '@/components/MovieFilter.vue'
 
 // --- ESTADO ---
 const allMovies = ref([])
+const allUsers = ref([])
 const loading = ref(true)
 const error = ref(null)
 const page = ref(1)
@@ -73,12 +108,31 @@ const selectedFilters = ref({
 
 // --- CARGAR DATOS ---
 onMounted(async () => {
+  loading.value = true
   try {
-    const response = await axios.get(withApiBase('/movies/'))
-    allMovies.value = response.data
+    const moviesRes = await axios.get(withApiBase('/movies/'))
+    allMovies.value = Array.isArray(moviesRes.data) ? moviesRes.data : []
   } catch (err) {
-    console.error(err)
+    console.error('Error loading movies:', err)
     error.value = 'Failed to load movies. Please try again later.'
+    allMovies.value = []
+  }
+
+  try {
+    const usersRes = await axios.get(withApiBase('/api/users/'))
+    // Convertir a array real (DRF puede devolver ReturnList que no es reconocido como array)
+    const usersData = usersRes.data
+    if (Array.isArray(usersData)) {
+      allUsers.value = [...usersData] // Crear copia como array real
+    } else if (usersData && typeof usersData === 'object' && usersData.length !== undefined) {
+      // Si tiene length pero no es array, convertirlo
+      allUsers.value = Array.from(usersData)
+    } else {
+      allUsers.value = []
+    }
+  } catch (err) {
+    console.error('Error loading users:', err)
+    allUsers.value = []
   } finally {
     loading.value = false
   }
@@ -86,6 +140,9 @@ onMounted(async () => {
 
 // --- GENERAR LISTAS DINÁMICAS ---
 const availableGenres = computed(() => {
+  if (!Array.isArray(allMovies.value)) {
+    return []
+  }
   const genres = new Set()
   allMovies.value.forEach(movie => {
     if (movie.genres && Array.isArray(movie.genres)) {
@@ -96,6 +153,9 @@ const availableGenres = computed(() => {
 })
 
 const availableYears = computed(() => {
+  if (!Array.isArray(allMovies.value)) {
+    return []
+  }
   const years = allMovies.value
     .map(m => parseInt(m.startYear))
     .filter(y => !isNaN(y))
@@ -107,15 +167,16 @@ const availableYears = computed(() => {
 
 // --- FILTRADO ---
 const filteredMovies = computed(() => {
+  if (!Array.isArray(allMovies.value)) {
+    return []
+  }
   let result = allMovies.value
 
-  // 🔹 Búsqueda
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
-    result = result.filter(m => m.primaryTitle.toLowerCase().includes(q))
+    result = result.filter(m => m?.primaryTitle?.toLowerCase().includes(q))
   }
 
-  // 🔹 Filtros
   if (selectedFilters.value.genre) {
     result = result.filter(m => m.genres?.includes(selectedFilters.value.genre))
   }
@@ -124,18 +185,17 @@ const filteredMovies = computed(() => {
   }
   if (selectedFilters.value.director) {
     result = result.filter(m =>
-      m.director?.toLowerCase().includes(selectedFilters.value.director.toLowerCase())
+      m.director?.toLowerCase().includes(selectedFilters.value.director?.toLowerCase() || '')
     )
   }
   if (selectedFilters.value.actor) {
     result = result.filter(m =>
       m.actors?.some(a =>
-        a.toLowerCase().includes(selectedFilters.value.actor.toLowerCase())
+        a?.toLowerCase().includes(selectedFilters.value.actor?.toLowerCase() || '')
       )
     )
   }
 
-  // 🔹 Ordenar
   if (selectedFilters.value.sortBy === 'rating') {
     result = [...result].sort((a, b) => {
       const valA = a.average_rating || 0
@@ -159,6 +219,23 @@ const filteredMovies = computed(() => {
   }
 
   return result
+})
+
+// --- FILTRADO USUARIOS ---
+const filteredUsers = computed(() => {
+  if (!searchQuery.value.trim()) return []
+  if (!Array.isArray(allUsers.value)) {
+    return []
+  }
+  const q = searchQuery.value.toLowerCase()
+
+  return allUsers.value
+    .filter(u => u && u.username && u.username.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const usernameA = a?.username || ''
+      const usernameB = b?.username || ''
+      return usernameA.localeCompare(usernameB)
+    })
 })
 
 // --- APLICAR FILTROS ---

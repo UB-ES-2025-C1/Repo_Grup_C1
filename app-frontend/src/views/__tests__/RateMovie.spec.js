@@ -21,10 +21,12 @@ vi.mock('@/utils/api', () => ({
 
 // Mock vue-router: useRouter (para router.push)
 const pushMock = vi.fn()
+const replaceMock = vi.fn()
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
     push: pushMock
+    , replace: replaceMock
   })
 }))
 
@@ -59,10 +61,14 @@ const mountRateMovie = async (options = {}) => {
   axios.get.mockReset()
   axios.post.mockReset()
   pushMock.mockReset()
+  replaceMock.mockReset()
   localStorage.clear()
 
   if (hasToken) {
-    localStorage.setItem('access', 'fake-token')
+    window.localStorage.setItem('access', 'fake-token')
+    window.localStorage.setItem('refresh', 'fake-token')
+    window.localStorage.setItem('username', 'fake-username')
+    window.localStorage.setItem('avatar', 'fake-avatar')
   }
 
   // Mock de axios.get según URL
@@ -128,8 +134,8 @@ describe('RateMovie', () => {
 
     await flushPromises()
 
-    // Debe haber intentado redirigir al login
-    expect(pushMock).toHaveBeenCalledWith({ name: 'login' })
+    // Debe haber intentado redirigir al login (se usa router.replace)
+    expect(replaceMock).toHaveBeenCalledWith({ name: 'login' })
   })
 
   it('carga título de la película y rating existente cuando hay token', async () => {
@@ -171,13 +177,13 @@ describe('RateMovie', () => {
     })
 
     const form = wrapper.vm.form
-    // overall_score por defecto: 5
-    expect(form.overall_score).toBe(5)
+    // overall_score por defecto: 10
+    expect(form.overall_score).toBe(10)
     // otros campos también por defecto
-    expect(form.soundtrack).toBe(5)
-    expect(form.acting).toBe(5)
-    expect(form.cinematography).toBe(5)
-    expect(form.plot).toBe(5)
+    expect(form.soundtrack).toBe(10)
+    expect(form.acting).toBe(10)
+    expect(form.cinematography).toBe(10)
+    expect(form.plot).toBe(10)
     expect(form.comment).toBe('')
 
     // No mensaje de error global
@@ -240,12 +246,13 @@ describe('RateMovie', () => {
 
     localStorage.removeItem('access')
     pushMock.mockReset()
+    replaceMock.mockReset()
     axios.post.mockReset()
 
     await wrapper.vm.submitRating()
     await flushPromises()
 
-    expect(pushMock).toHaveBeenCalledWith({ name: 'login' })
+    expect(replaceMock).toHaveBeenCalledWith({ name: 'login' })
     expect(axios.post).not.toHaveBeenCalled()
   })
 })

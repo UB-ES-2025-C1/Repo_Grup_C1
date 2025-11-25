@@ -19,36 +19,61 @@
         <h1>{{ movie.primaryTitle }} ({{ movie.startYear }})</h1>
         <p class="description">{{ movie.description }}</p>
         <ul class="stats">
-          <li>⭐ Rating: <strong>{{ movie.average_rating }}</strong></li>
+          <li>⭐ Overall rating: <strong>{{ movie.average_rating }}</strong></li>
           <li>👥 Votes: <strong>{{ movie.numVotes.toLocaleString() }}</strong></li>
         </ul>
-        <!-- Preview the user's existing rating if available -->
-        <div v-if="hasUserRating && ratingPreview" class="user-rating-preview">
-          <h3>Your rating</h3>
-          <div class="preview-row">
-            <p class="overall">Overall: {{ ratingPreview.overall_score }}</p>
-            <div class="mini-stats">
-              <span>Soundtrack: {{ ratingPreview.soundtrack }}</span>
-              <span>Acting: {{ ratingPreview.acting }}</span>
-              <span>Cinematography: {{ ratingPreview.cinematography }}</span>
-              <span>Plot: {{ ratingPreview.plot }}</span>
-            </div>
-          </div>
-          <p v-if="ratingPreview.comment" class="comment">"{{ ratingPreview.comment }}"</p>
+        <!-- Per-aspect averages -->
+        <div class="aspect-averages">
+          <h3>Average by aspect</h3>
+          <ul>
+            <li>🎵 Soundtrack: <strong>{{ movie.average_soundtrack ?? 0 }}</strong></li>
+            <li>🎭 Acting: <strong>{{ movie.average_acting ?? 0 }}</strong></li>
+            <li>🎬 Cinematography: <strong>{{ movie.average_cinematography ?? 0 }}</strong></li>
+            <li>🧩 Plot: <strong>{{ movie.average_plot ?? 0 }}</strong></li>
+          </ul>
         </div>
-        <div class="actions" style="margin-top:1rem">
-          <router-link :to="{ name: 'movie-rate', params: { tconst: movie.tconst } }">
-            <button>{{ hasUserRating ? 'Change Rating' : 'Rate' }}</button>
-          </router-link>
-        </div>
+      </div>
+    </div>
+    <!-- Preview the user's existing rating if available -->
+    <h2>Your rating</h2>
+    <p v-if="!hasUserRating" style="color:var(--muted)">You haven't rated this movie yet.</p>
+    <div class="user-rating-preview" v-if="hasUserRating && ratingPreview">
+      <CommentCard :rating="ratingPreview" :profileRouteName="null" />
+    </div>
+    <div class="actions" style="margin-top:1rem; margin-bottom:3rem;">
+      <router-link :to="{ name: 'movie-rate', params: { tconst: tconst } }">
+        <button class="primary">{{ hasUserRating ? 'Change rating' : 'Rate' }}</button>
+      </router-link>
+      <!-- Delete button shown when the user already has a rating -->
+      <button v-if="hasUserRating" class="ghost" @click="deleteRating" style="margin-left:.5rem">Delete rating</button>
+      <!-- Delete comment button shown when the user has a comment on their rating -->
+      <button v-if="hasUserRating && ratingPreview && ratingPreview.comment" class="ghost" @click="deleteComment" style="margin-left:.5rem">Delete comment</button>
+    </div>
+    <p v-if="deleteSuccess" class="success" style="margin-top:.5rem">{{ deleteSuccess }}</p>
+    <p v-if="deleteError" class="error" style="margin-top:.5rem">{{ deleteError }}</p>
+    <p v-if="commentDeleteSuccess" class="success" style="margin-top:.5rem">{{ commentDeleteSuccess }}</p>
+    <p v-if="commentDeleteError" class="error" style="margin-top:.5rem">{{ commentDeleteError }}</p>
+
+    <!-- Public comments from other users (newest first) with pagination -->
+    <div v-if="commentsAll && commentsAll.length" class="comments-section" style="margin-top:1.5rem">
+      <h2>Other reviews</h2>
+      <div class="comments-list">
+        <CommentCard v-for="c in displayedComments" :key="c.id" :rating="c" profileRouteName="user-profile" />
+      </div>
+
+      <div v-if="totalPages > 1" class="pagination" style="margin-top:1rem; display:flex; gap:.5rem; align-items:center;">
+        <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1">‹</button>
+        <button v-for="n in totalPages" :key="n" @click="goToPage(n)" :class="{ active: n === currentPage }">{{ n }}</button>
+        <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages">›</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import AppHeader from '@/components/AppHeader.vue'
+import CommentCard from '@/components/CommentCard.vue'
 import axios from 'axios';
 import { withApiBase } from '@/utils/api';
 
@@ -65,12 +90,34 @@ const props = defineProps({
   },
 });
 
+// expose prop as local binding so template can use `tconst` without accessing `movie`
+const tconst = props.tconst;
+
 // 2. Definimos las variables de estado
 const movie = ref(null);
 const loading = ref(true);
 const error = ref(null);
 const hasUserRating = ref(false);
 const ratingPreview = ref(null);
+const comments = ref([]);
+// pagination for comments: 5 rows x 2 columns = 10 items per page
+const commentsAll = ref([]);
+const pageSize = 10;
+const currentPage = ref(1);
+const totalPages = computed(() => Math.max(1, Math.ceil(commentsAll.value.length / pageSize)));
+const displayedComments = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return commentsAll.value.slice(start, start + pageSize);
+});
+
+function goToPage(n) {
+  if (n < 1 || n > totalPages.value) return;
+  currentPage.value = n;
+}
+const deleteError = ref(null);
+const deleteSuccess = ref(null);
+const commentDeleteError = ref(null);
+const commentDeleteSuccess = ref(null);
 
 // 3. Cuando el componente se monta, llamamos a la API
 onMounted(async () => {
@@ -99,6 +146,35 @@ onMounted(async () => {
         hasUserRating.value = false;
       }
     }
+      // Fetch public comments (other users' ratings) for this movie
+      try {
+        const commentsResp = await axios.get(withApiBase(`/movies/${props.tconst}/ratings/`));
+        // Exclude possible duplicate of the authenticated user's rating (we'll show it separately)
+        let fetched = commentsResp.data || [];
+        if (hasUserRating.value && ratingPreview.value) {
+          fetched = fetched.filter((r) => {
+            if (!r) return false;
+            if (r.id && ratingPreview.value.id) return r.id !== ratingPreview.value.id;
+            if (r.user && ratingPreview.value.user) return r.user.username !== ratingPreview.value.user.username;
+            return true;
+          });
+        }
+        // Keep only ratings that include a non-empty comment
+        fetched = fetched.filter((r) => r && r.comment && String(r.comment).trim().length > 0);
+        // Sort newest-first by date (fallback to id)
+        fetched.sort((a, b) => {
+          const da = a?.date ? new Date(a.date).getTime() : 0;
+          const db = b?.date ? new Date(b.date).getTime() : 0;
+          if (da === db) return (b.id || 0) - (a.id || 0);
+          return db - da;
+        });
+        comments.value = fetched;
+        commentsAll.value = fetched;
+      } catch (cErr) {
+        // non-fatal: just keep comments empty
+        console.warn('Could not fetch comments for movie', cErr);
+        comments.value = [];
+      }
   } catch (err) {
     console.error(err);
     error.value = 'Could not fetch movie details.';
@@ -106,6 +182,97 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+async function deleteRating() {
+  deleteError.value = null;
+  deleteSuccess.value = null;
+
+  // confirmation dialog
+  const confirmed = window.confirm('Are you sure you want to delete your rating? This action cannot be undone.');
+  if (!confirmed) return;
+
+  const token = localStorage.getItem('access');
+  if (!token) {
+    deleteError.value = 'Not authenticated.';
+    return;
+  }
+
+  try {
+    await axios.delete(withApiBase(`/movies/ratings/${props.tconst}/`), {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    deleteSuccess.value = '';
+    hasUserRating.value = false;
+    ratingPreview.value = null;
+
+    // Refresh movie data to update numVotes / average_rating
+    try {
+      const resp = await axios.get(withApiBase(`/movies/${props.tconst}/`));
+      movie.value = resp.data;
+    } catch (fetchErr) {
+      console.warn('Could not refresh movie after delete', fetchErr);
+    }
+  } catch (err) {
+    console.error(err);
+    if (err.response && err.response.data) {
+      deleteError.value = err.response.data.detail || JSON.stringify(err.response.data);
+    } else {
+      deleteError.value = 'Error deleting rating.';
+    }
+  }
+}
+
+async function deleteComment() {
+  commentDeleteError.value = null;
+  commentDeleteSuccess.value = null;
+
+  const confirmed = window.confirm('Are you sure you want to delete your comment from your rating?');
+  if (!confirmed) return;
+
+  const token = localStorage.getItem('access');
+  if (!token) {
+    commentDeleteError.value = 'Not authenticated.';
+    return;
+  }
+
+  // Build payload using existing rating preview values, but with empty comment
+  const payload = {
+    movie: props.tconst,
+    overall_score: ratingPreview.value?.overall_score ?? 0,
+    soundtrack: ratingPreview.value?.soundtrack ?? 0,
+    acting: ratingPreview.value?.acting ?? 0,
+    cinematography: ratingPreview.value?.cinematography ?? 0,
+    plot: ratingPreview.value?.plot ?? 0,
+    comment: ''
+  };
+
+  try {
+    await axios.post(withApiBase(`/movies/ratings/`), payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    commentDeleteSuccess.value = '';
+    // update local preview
+    if (ratingPreview.value) ratingPreview.value.comment = '';
+
+    // Optionally refresh movie aggregates
+    try {
+      const resp = await axios.get(withApiBase(`/movies/${props.tconst}/`));
+      movie.value = resp.data;
+    } catch (refreshErr) {
+      // non-fatal
+      console.warn('Could not refresh movie after comment delete', refreshErr);
+    }
+  } catch (err) {
+    console.error(err);
+    if (err.response && err.response.data) {
+      commentDeleteError.value = err.response.data.detail || JSON.stringify(err.response.data);
+    } else {
+      commentDeleteError.value = 'Error removing comment.';
+    }
+  }
+}
 </script>
 
 <style scoped>
@@ -114,7 +281,7 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 1fr;
   gap: 2rem;
-  padding: 2rem 0;
+  padding: 1rem 0 0.5rem;
 }
 
 @media (min-width: 768px) {
@@ -145,16 +312,52 @@ onMounted(async () => {
   font-size: 1.1rem;
 }
 
-.user-rating-preview {
-  margin-top: 3rem;
-  padding: .75rem;
-  background: var(--card);
-  border-radius: 8px;
-}
-.user-rating-preview h3 { margin: 0 0 1rem; }
+
 .preview-row { display:flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
 .overall { margin:0; font-weight:600; }
 .mini-stats { display:flex; gap: .7rem; flex-wrap:wrap; color: var(--muted); }
 .mini-stats span { background: transparent; padding: .15rem 0rem; border-radius: 6px; font-size: .95rem }
-.user-rating-preview .comment { margin-top:1rem; color: var(--text); font-style: italic }
+
+/* Per-aspect averages styles */
+.aspect-averages { margin-top: 1.5rem }
+.aspect-averages h3 { margin: 0 0 .5rem; font-size: 1rem; color: var(--muted) }
+.aspect-averages ul { list-style: none; padding: 0; margin: 0; display: block }
+.aspect-averages li { display: block; background: transparent; padding: .25rem 0; color: var(--muted); width: 100% }
+
+
+/* Comments list: grid layout (1 column on small screens, 2 columns on wider screens) */
+.comments-section {
+  margin-bottom: 3rem;
+}
+.comments-section .comments-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .comments-section .comments-list {
+    grid-template-columns: repeat(2, minmax(300px, 1fr));
+  }
+}
+/* Pagination button styles (match ProfileView) */
+.comments-section .pagination button {
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: var(--card);
+  cursor: pointer;
+}
+.comments-section .pagination button.active {
+  background: var(--primary);
+  color: white;
+  font-weight: 700;
+}
+.comments-section .pagination button:disabled { opacity: 0.4; cursor: default }
+
+.user-rating-preview { width: 100%; box-sizing: border-box }
+@media (min-width: 900px) {
+  .user-rating-preview { width: calc(50% - 0.5rem); }
+}
+.user-rating-preview .user-rating-card { max-width: none; width: 100%; }
 </style>

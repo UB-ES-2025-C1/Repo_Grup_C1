@@ -41,7 +41,7 @@
       </div>
       <div v-else>
         <p style="color:#94a3b8; margin-top:1rem; text-align:center">
-          Do you want to go home?
+          Are you lost?
           <router-link to="/" style="color:#3b82f6; text-decoration:none; font-weight:500;">
             Go Home
           </router-link>

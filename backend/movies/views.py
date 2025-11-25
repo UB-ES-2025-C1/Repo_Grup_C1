@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -8,6 +8,10 @@ from .serializers import UserRegisterSerializer, UserLoginSerializer, MovieSeria
 from django.db.models import Avg
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import permissions, generics
+from .models import Profile
+from .serializers import UserProfileSerializer, ProfileUpdateSerializer
+from rest_framework.decorators import api_view
+
 
 
 class UserRegisterAPIView(generics.CreateAPIView):
@@ -121,5 +125,92 @@ class UserMovieRatingAPIView(generics.RetrieveUpdateDestroyAPIView):
     headers: { Authorization: `Bearer ${accessToken}` }
     }).then(res => console.log(res.data));
     '''
+class UserProfileDetailAPIView(generics.RetrieveAPIView):
+    """
+    View to see a user's profile. Publicly accessible.
+    """
+    queryset = Profile.objects.all().select_related('user') # Optimization to fetch the user in the same query
+    serializer_class = UserProfileSerializer
+    permission_classes = [permissions.AllowAny] # Important to make it public!
+    lookup_field = 'user__username' # We tell DRF to look up by the related user's username
 
+class MyProfileAPIView(generics.RetrieveUpdateAPIView):
+    """
+    Allows the authenticated user to view and update their own profile.
+    """
+    permission_classes = [permissions.IsAuthenticated] # Only authenticated users
+
+    def get_object(self):
+        """
+        We override this method to always return the profile
+        of the user making the request (request.user).
+        """
+        # self.request.user is available thanks to IsAuthenticated
+        return self.request.user.profile
+
+    def get_serializer_class(self):
+        """
+        Optional: Use a different serializer for reading vs. writing.
+        """
+        if self.request.method in ['PUT', 'PATCH']:
+            return ProfileUpdateSerializer
+        return UserProfileSerializer
+
+# Add this new view at the end
+class UserRatingsListAPIView(generics.ListAPIView):
+    """
+    Provides a public, read-only list of all ratings made by a specific user.
+    """
+    serializer_class = RatingSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        """
+        This view should return a list of all the ratings for the
+        user as determined by the username portion of the URL.
+        """
+        # Get the username from the URL kwargs
+        username = self.kwargs['user__username']
+        # Find the user, or return a 404 if they don't exist
+        user = get_object_or_404(User, username=username)
+        # Filter the ratings queryset to only include ratings from that user
+        return Rating.objects.filter(user=user).select_related('movie').order_by('-id') # Order by most recent
+
+
+class MovieRatingsListAPIView(generics.ListAPIView):
+    """
+    Public list of ratings for a given movie (tconst), ordered by newest first.
+    Excludes the authenticated user's rating (so the frontend can show the user's preview separately).
+    """
+    serializer_class = RatingSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        tconst = self.kwargs.get('tconst')
+        qs = Rating.objects.filter(movie__tconst=tconst).select_related('user', 'movie')
+        # Exclude the requesting user's rating if authenticated
+        user = getattr(self.request, 'user', None)
+        try:
+            if user and user.is_authenticated:
+                qs = qs.exclude(user=user)
+        except Exception:
+            # In case request.user is not usable, skip exclusion
+            pass
+        # Order by date descending (newest first). Fall back to id desc if date missing.
+        return qs.order_by('-date', '-id')
+
+@api_view(["GET"])
+def get_all_users(request):
+    """
+    Retorna todos los perfiles con su usuario asociado.
+    Filtra por username si se pasa ?q=texto
+    """
+    query = request.GET.get("q", "").strip()
     
+    if query:
+        profiles = Profile.objects.select_related("user").filter(user__username__icontains=query)
+    else:
+        profiles = Profile.objects.select_related("user").all()
+    
+    serializer = UserProfileSerializer(profiles, many=True)
+    return Response(serializer.data)

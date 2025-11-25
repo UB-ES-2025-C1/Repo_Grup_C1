@@ -70,11 +70,11 @@ const success = ref(null);
 const movieTitle = ref(null);
 
 const form = ref({
-  overall_score: 5,
-  soundtrack: 5,
-  acting: 5,
-  cinematography: 5,
-  plot: 5,
+  overall_score: 10,
+  soundtrack: 10,
+  acting: 10,
+  cinematography: 10,
+  plot: 10,
   comment: ''
 });
 
@@ -96,9 +96,11 @@ onMounted(async () => {
 
     // Try to fetch user's rating for this movie
     const token = getAccessToken();
+    console.log('Access token:', token);
     if (!token) {
-      // Not authenticated - redirect to login
-      router.push({ name: 'login' });
+      // Not authenticated - redirect to login and replace history so back returns to movie page
+      console.log('No access token found');
+      router.replace({ name: 'login' });
       return;
     }
 
@@ -118,9 +120,6 @@ onMounted(async () => {
   } catch (err) {
     if (err.response && err.response.status === 404) {
       // user has not rated yet - leave defaults
-    } else if (err.response && err.response.status === 401) {
-      router.push({ name: 'login' });
-      return;
     } else {
       console.error(err);
       error.value = 'Error loading data.';
@@ -136,7 +135,7 @@ async function submitRating() {
 
   const token = getAccessToken();
   if (!token) {
-    router.push({ name: 'login' });
+    router.replace({ name: 'login' });
     return;
   }
 
@@ -163,6 +162,45 @@ async function submitRating() {
   } catch (err) {
     console.error(err);
     error.value = err.response?.data || 'Error saving rating.';
+  }
+}
+
+async function deleteComment() {
+  error.value = null;
+  success.value = null;
+
+  if (!form.value.comment) return;
+
+  const confirmed = window.confirm('Are you sure you want to delete your comment?');
+  if (!confirmed) return;
+
+  const token = getAccessToken();
+  if (!token) {
+    router.replace({ name: 'login' });
+    return;
+  }
+
+  // build payload similar to submitRating but with empty comment
+  const payload = {
+    movie: tconst,
+    overall_score: form.value.overall_score,
+    soundtrack: form.value.soundtrack,
+    acting: form.value.acting,
+    cinematography: form.value.cinematography,
+    plot: form.value.plot,
+    comment: ''
+  };
+
+  try {
+    await axios.post(withApiBase(`/movies/ratings/`), payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // clear the local form comment and show success
+    form.value.comment = '';
+    success.value = 'Comment deleted.';
+  } catch (err) {
+    console.error(err);
+    error.value = err.response?.data || 'Error deleting comment.';
   }
 }
 </script>

@@ -1,0 +1,100 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ main, pre-prod ]
+  workflow_dispatch:  # Permite ejecución manual
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Set deployment path based on branch
+        id: set_path
+        run: |
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            echo "repo_path=/srv/ub/Repo_Grup_C1" >> $GITHUB_OUTPUT
+            echo "branch=main" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_name }}" == "pre-prod" ]; then
+            echo "repo_path=/srv/ub/Repo_Grup_C1_preprod" >> $GITHUB_OUTPUT
+            echo "branch=pre-prod" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            REPO_PATH="${{ steps.set_path.outputs.repo_path }}"
+            BRANCH="${{ steps.set_path.outputs.branch }}"
+            
+            echo "Deploying to: $REPO_PATH"
+            echo "Branch: $BRANCH"
+            
+            cd $REPO_PATH
+            
+            # Verificar y cargar variables del .env
+            echo "Checking .env file..."
+            if [ ! -f .env ]; then
+              echo "ERROR: .env file not found in $REPO_PATH"
+              exit 1
+            fi
+            
+            # Cargar variables del .env al entorno (para debugging y asegurar que estén disponibles)
+            set -a  # Automáticamente exporta todas las variables
+            source .env
+            set +a  # Desactiva el modo automático
+            
+            # Verificar que las variables críticas están definidas (sin mostrar valores)
+            echo "Verifying critical environment variables..."
+            REQUIRED_VARS=("SECRET_KEY" "DEBUG" "ALLOWED_HOSTS" "CSRF_TRUSTED_ORIGINS")
+            MISSING_VARS=()
+            for var in "${REQUIRED_VARS[@]}"; do
+              if [ -z "${!var}" ]; then
+                MISSING_VARS+=("$var")
+              else
+                echo "✓ $var is set (value hidden for security)"
+              fi
+            done
+            
+            if [ ${#MISSING_VARS[@]} -ne 0 ]; then
+              echo "ERROR: Missing required environment variables: ${MISSING_VARS[*]}"
+              exit 1
+            fi
+            
+            echo "All required environment variables are loaded."
+            
+            # Definir nombres de contenedores según el entorno
+            if [ "$BRANCH" == "main" ]; then
+              export CONTAINER_NAME_BACKEND="cinemaub-prod-backend"
+              export CONTAINER_NAME_FRONTEND="cinemaub-prod-frontend"
+            elif [ "$BRANCH" == "pre-prod" ]; then
+              export CONTAINER_NAME_BACKEND="cinemaub-preprod-backend"
+              export CONTAINER_NAME_FRONTEND="cinemaub-preprod-frontend"
+            fi
+            
+            echo "Container names: $CONTAINER_NAME_BACKEND, $CONTAINER_NAME_FRONTEND"
+            
+            # Parar los contenedores
+            echo "Stopping containers..."
+            docker compose -f docker-compose.backend.yml down || true
+            docker compose -f docker-compose.frontend.yml down || true
+            
+            # Hacer pull del código (sin cambiar de rama)
+            echo "Pulling latest code..."
+            git pull origin
+            
+            # Reconstruir y levantar los contenedores
+            echo "Building and starting containers..."
+            docker compose -f docker-compose.backend.yml up -d --build
+            docker compose -f docker-compose.frontend.yml up -d --build
+            
+            # Limpiar imágenes huérfanas (opcional)
+            echo "Cleaning up unused images..."
+            docker image prune -f
+            
+            echo "Deployment completed successfully!"

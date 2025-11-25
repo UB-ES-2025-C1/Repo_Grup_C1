@@ -4,6 +4,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import Avg
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import Avg
 
 
 class Movie(models.Model):
@@ -107,6 +108,8 @@ class Movie(models.Model):
 class Rating(models.Model):
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='ratings')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # Fecha de creación del rating (autoestablecida al crear)
+    date = models.DateTimeField(auto_now_add=True)
     # Valoración general (0-10)
     overall_score = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
 
@@ -121,3 +124,46 @@ class Rating(models.Model):
 
     def __str__(self):
         return f'{self.movie} - {self.user.username}: {self.overall_score}'
+    
+
+def avatar_upload_path(instance, filename):
+    '''
+    Devuelve el path donde subir la foto de perfil segun el usuario.
+    Solo se permite una foto por usuario, para no colapsar la base de datos.
+    '''
+    extension = filename.split('.')[-1]
+    return f"profile_photos/user_{instance.user.id}.{extension}"
+
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    bio = models.TextField(blank=True, null=True)
+    photo = models.ImageField(upload_to=avatar_upload_path, blank=True, null=True)
+
+    @property
+    def average_rating(self):
+        """
+        Calculates the average of all 'overall_score' ratings
+        made by this user.
+        """
+        # We use 'user.rating_set' to access the related ratings
+        aggregation = self.user.rating_set.aggregate(average=Avg('overall_score'))
+        avg = aggregation.get('average')
+
+        if avg is None:
+            return 0
+        
+        return round(avg, 1)
+
+    def __str__(self):
+        return f'{self.user.username} Profile'
+    
+    def save(self, *args, **kwargs):
+        try:
+            old = Profile.objects.get(pk=self.pk)
+            if old.photo and old.photo != self.photo:
+                old.photo.delete(save=False)
+        except Profile.DoesNotExist:
+            pass
+
+        super().save(*args, **kwargs)
