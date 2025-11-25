@@ -22,6 +22,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('movies/', include('movies.urls')),
+    path('api/', include('movies.urls')),
     # path('movies/<int:movie_id>/', include('movies.urls')),
 ]
 

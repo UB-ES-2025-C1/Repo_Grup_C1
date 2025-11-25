@@ -19,7 +19,7 @@
 
     <div class="meta">
       <h3>{{ rating.movie_info.primary_title }} ({{ rating.movie_info.start_year }})</h3>
-      <p>Rating: {{ rating.overall_score }}</p>
+      <p class="rating"><span class="label">Rating:</span> <span class="value">{{ rating.overall_score }}</span></p>
       <p v-if="rating.comment" class="comment">"{{ rating.comment }}"</p>
     </div>
   </router-link>
@@ -68,4 +68,12 @@ const getImageUrl = (posterPath) => {
   color: var(--muted);
   font-size: 0.9rem;
 }
+/* Estilo para que el comentario aparezca en cursiva */
+.comment {
+  font-style: italic;
+}
+
+/* Make the label muted and the numeric rating bold like in CommentCard */
+.meta .rating { color: var(--muted); margin: 0.5rem 0; }
+.meta .rating .value { color: var(--text); font-weight: 700; }
 </style>

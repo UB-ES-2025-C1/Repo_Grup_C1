@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-m*-h(1%zag%9daw=(=1ggz*p%g%60dj=b!v^7@9gxag*ib5v*&')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
+DEBUG = True
 
 # ALLOWED_HOSTS from environment variable (comma-separated) or default
 ALLOWED_HOSTS_STR = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,cinemaub.llurbatech.com,cinemaub-beta.llurbatech.com')

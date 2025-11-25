@@ -9,6 +9,7 @@ Run with:
 
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
@@ -419,7 +420,141 @@ class TestProfileAPI(APITestCase):
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_authenticated_user_can_upload_profile_photo(self):
+        """
+		Test that the user can upload profile photo via PATCH /me/.
+		"""
+        self.client.force_authenticate(user=self.user1)
+        url = '/movies/profiles/me/'
 
+		# Upload photo
+        test_image = SimpleUploadedFile(
+            "avatar.jpg", b"file_content", content_type="image/jpeg"
+        )
 
+        response = self.client.patch(
+            url,
+            data={},
+            files={'photo': test_image},
+            format='multipart'
+        )
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user1.profile.refresh_from_db()
+        self.assertIsNotNone(self.user1.profile.photo)
 
+    def test_existing_photo_is_replaced_when_uploading_new_one(self):
+        """
+        Tests uploading a new photo replaces the old image file.
+        """
+        self.client.force_authenticate(user=self.user1)
+        url = '/movies/profiles/me/'
+
+        # Upload first photo
+        first_image = SimpleUploadedFile(
+            'initial.jpg', b'first', content_type='image/jpeg'
+        )
+        self.client.patch(
+            url,
+            data={},
+            files={'photo': first_image},
+            format='multipart'
+        )
+        old_path = self.user1.profile.photo.name
+
+        # Upload second photo
+        second_image = SimpleUploadedFile(
+            'new.jpg', b'second', content_type='image/jpeg'
+        )
+        response = self.client.patch(
+            url,
+            data={},
+            files={'photo': second_image},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.user1.profile.refresh_from_db()
+        new_path = self.user1.profile.photo.name
+
+        self.assertNotEqual(old_path, new_path)
+        self.assertIsNotNone(self.user1.profile.photo)
+
+    def test_user_can_remove_photo(self):
+        """
+        Test if remove_photo=true is sent, existing photo should be deleted.
+        """
+
+        self.client.force_authenticate(user=self.user1)
+        url = '/movies/profiles/me/'
+
+        # Upload photo
+        test_image = SimpleUploadedFile(
+            "avatar.jpg", b"file_content", content_type="image/jpeg"
+        )
+        
+        self.client.patch(
+            url,
+            data={},
+            files={'photo': test_image},
+            format='multipart'
+        )
+        self.assertIsNotNone(self.user1.profile.photo)
+
+        # Remove photo
+        response = self.client.patch(
+            url, 
+        	data={'remove_photo': 'true'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.user1.profile.refresh_from_db()
+        self.assertFalse(bool(self.user1.profile.photo))
+
+class TestUserSearchAPI(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.u1 = User.objects.create_user(username='Aaron', email='a1@test.com', password='pw')
+        self.u2 = User.objects.create_user(username='Bea', email='b2@test.com', password='pw')
+        self.u3 = User.objects.create_user(username='Charlie', email='c3@test.com', password='pw')
+        for u in [self.u1, self.u2, self.u3]:
+            self.assertTrue(hasattr(u, 'profile'))
+
+    def test_get_all_users_no_query(self):
+        url = '/api/users/'
+        resp = self.client.get(url, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 3)
+
+        # Ajustado a la estructura plana
+        usernames = [item['username'] for item in resp.data]
+        self.assertCountEqual(usernames, ['Aaron', 'Bea', 'Charlie'])
+
+    def test_get_all_users_with_query(self):
+        url = '/api/users/?q=ar'
+        resp = self.client.get(url, format='json')
+        self.assertEqual(resp.status_code, 200)
+
+        usernames = [item['username'] for item in resp.data]
+        # "Aaron" y "Charlie" contienen "ar" (case-insensitive)
+        self.assertCountEqual(usernames, ['Aaron', 'Charlie'])
+
+    def test_get_all_users_empty_result(self):
+        url = '/api/users/?q=zzz'
+        resp = self.client.get(url, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 0)
+
+    def test_response_structure(self):
+        url = '/api/users/'
+        resp = self.client.get(url, format='json')
+        self.assertEqual(resp.status_code, 200)
+        for item in resp.data:
+            # Ahora comprobamos la estructura real
+            self.assertIn('username', item)
+            self.assertIn('bio', item)
+            self.assertIn('photo', item)
+            self.assertIn('average_rating', item)
+            
