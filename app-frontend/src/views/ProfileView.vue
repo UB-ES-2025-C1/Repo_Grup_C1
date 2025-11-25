@@ -176,6 +176,7 @@ onMounted(async () => {
   }
 });
 
+// Compute avatar src robustly: prefer rating.user.photo when provided by API.
 function resolvePhotoSrc(photo) {
   if (!photo) return defaultAvatar;
   // If it's already absolute, use as-is
