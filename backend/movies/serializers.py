@@ -337,6 +337,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     # The 'average_rating' field comes from the Profile model's property
     average_rating = serializers.FloatField(read_only=True)
 
+    photo = serializers.SerializerMethodField()
+
     class Meta:
         model = Profile
         fields = ['username', 'bio', 'photo', 'average_rating']
