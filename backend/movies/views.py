@@ -10,6 +10,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import permissions, generics
 from .models import Profile
 from .serializers import UserProfileSerializer, ProfileUpdateSerializer
+from rest_framework.decorators import api_view
+
 
 
 class UserRegisterAPIView(generics.CreateAPIView):
@@ -196,3 +198,19 @@ class MovieRatingsListAPIView(generics.ListAPIView):
             pass
         # Order by date descending (newest first). Fall back to id desc if date missing.
         return qs.order_by('-date', '-id')
+
+@api_view(["GET"])
+def get_all_users(request):
+    """
+    Retorna todos los perfiles con su usuario asociado.
+    Filtra por username si se pasa ?q=texto
+    """
+    query = request.GET.get("q", "").strip()
+    
+    if query:
+        profiles = Profile.objects.select_related("user").filter(user__username__icontains=query)
+    else:
+        profiles = Profile.objects.select_related("user").all()
+    
+    serializer = UserProfileSerializer(profiles, many=True)
+    return Response(serializer.data)

@@ -50,17 +50,31 @@ const sampleMovies = [
   }
 ]
 
+// Datos de usuarios para test
+const sampleUsers = [
+  { username: 'Aaron', bio: '', average_rating: 5 },
+  { username: 'Bea', bio: '', average_rating: 7 },
+  { username: 'Charlie', bio: '', average_rating: 9 }
+]
+
 // Helper para montar el componente con mocks/stubs
-const mountHome = async (movies = sampleMovies) => {
-  axios.get.mockResolvedValueOnce({ data: movies })
+const mountHome = async (movies = sampleMovies, users = sampleUsers) => {
+  axios.get.mockImplementation((url) => {
+    if (url.includes('/movies')) return Promise.resolve({ data: movies })
+    if (url.includes('/users')) return Promise.resolve({ data: users })
+    return Promise.resolve({ data: [] })
+  })
 
   const wrapper = mount(HomeView, {
     global: {
       stubs: {
-        // No necesitamos el comportamiento real, solo algo que acepte la prop "movie"
         MovieCard: {
           template: '<div class="movie-card-stub">{{ movie.primaryTitle }}</div>',
           props: ['movie']
+        },
+        UserCard: {
+          template: '<div class="user-card-stub">{{ user.username }}</div>',
+          props: ['user']
         },
         MovieFilter: true,
         'router-link': {
@@ -92,7 +106,7 @@ describe('HomeView', () => {
     const wrapper = await mountHome(sampleMovies)
 
     // Se llama a la API con la ruta construida por withApiBase
-    expect(axios.get).toHaveBeenCalledTimes(1)
+    expect(axios.get).toHaveBeenCalledTimes(2) // ahora hay llamada también a /users/
     expect(axios.get).toHaveBeenCalledWith('/api/movies/')
 
     // Se renderizan las tarjetas (stubs)
@@ -190,5 +204,33 @@ describe('HomeView', () => {
     // Ahora Prev habilitado, Next deshabilitado
     expect(prevButton.attributes('disabled')).toBeUndefined()
     expect(nextButton.attributes('disabled')).toBeDefined()
+  })
+
+  // 🆕 NUEVO TEST: filtra usuarios por texto
+  it('filtra usuarios según searchText', async () => {
+    const wrapper = await mountHome(sampleMovies, sampleUsers)
+
+    const input = wrapper.get('input.search-input')
+    await input.setValue('ar')
+
+    await flushPromises()
+
+    const cards = wrapper.findAll('.user-card-stub')
+
+    expect(cards.length).toBe(2)
+    expect(cards[0].text()).toBe('Aaron')
+  })
+
+  // 🆕 NUEVO TEST: si no hay coincidencias, no muestra usuarios
+  it('no muestra usuarios si ninguno coincide con el searchText', async () => {
+    const wrapper = await mountHome(sampleMovies, sampleUsers)
+
+    const input = wrapper.get('input.search-input')
+    await input.setValue('zzz')
+
+    await flushPromises()
+
+    const cards = wrapper.findAll('.user-card-stub')
+    expect(cards.length).toBe(0)
   })
 })
