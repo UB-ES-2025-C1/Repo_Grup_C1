@@ -78,7 +78,7 @@ onMounted(async () => {
 // Listen for profile updates in the same tab (ProfileView dispatches this)
 const onProfileUpdated = (ev) => {
   try {
-    const photo = ev && ev.detail && ev.detail.photo;
+    const photo = ev && ev.detail && ev.detail.photo_url;
     const name = ev && ev.detail && ev.detail.username;
     if (photo) {
       avatarUrl.value = resolvePhotoSrc(photo);
