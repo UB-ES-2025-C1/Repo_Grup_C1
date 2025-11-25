@@ -145,7 +145,7 @@ onMounted(async () => {
     
     const data = response.data;
     username.value = data.username;
-    avatarUrl.value = resolvePhotoSrc(data.photo);
+    avatarUrl.value = data.photo;
     bio.value = data.bio;
     averageRating.value = data.average_rating;
     newBio.value = bio.value || '';
@@ -175,16 +175,6 @@ onMounted(async () => {
     }
   }
 });
-
-function resolvePhotoSrc(photo) {
-  if (!photo) return defaultAvatar;
-  // If it's already absolute, use as-is
-  if (/^https?:\/\//i.test(photo)) return photo;
-  // If it starts with '/', assume it's a path served by the API (use withApiBase to make full URL)
-  if (photo.startsWith('/')) return withApiBase(photo);
-  // otherwise return as-is
-  return photo;
-}
 
 // --- MÉTODOS (Acciones del usuario) ---
 function openAvatarPicker() {
@@ -227,7 +217,7 @@ const saveChanges = async () => {
     const data = response.data;
     console.log(data);
     bio.value = data.bio;
-    avatarUrl.value = resolvePhotoSrc(data.photo);
+    avatarUrl.value = data.photo;
     newBio.value = bio.value || '';
     newAvatar.value.value = null;
     newAvatarFile.value = null;
