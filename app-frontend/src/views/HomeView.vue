@@ -42,7 +42,7 @@
         </div>
 
         <!-- Users -->
-        <div v-if="filteredUsers.length" style="margin-top: 2rem;">
+        <div v-if="filteredUsers.length > 0" style="margin-top: 2rem;">
           <h2>Users</h2>
           <div class="grid">
             <UserCard
@@ -120,7 +120,16 @@ onMounted(async () => {
 
   try {
     const usersRes = await axios.get(withApiBase('/api/users/'))
-    allUsers.value = Array.isArray(usersRes.data) ? usersRes.data : []
+    // Convertir a array real (DRF puede devolver ReturnList que no es reconocido como array)
+    const usersData = usersRes.data
+    if (Array.isArray(usersData)) {
+      allUsers.value = [...usersData] // Crear copia como array real
+    } else if (usersData && typeof usersData === 'object' && usersData.length !== undefined) {
+      // Si tiene length pero no es array, convertirlo
+      allUsers.value = Array.from(usersData)
+    } else {
+      allUsers.value = []
+    }
   } catch (err) {
     console.error('Error loading users:', err)
     allUsers.value = []
@@ -165,7 +174,7 @@ const filteredMovies = computed(() => {
 
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
-    result = result.filter(m => m.primaryTitle?.toLowerCase().includes(q))
+    result = result.filter(m => m?.primaryTitle?.toLowerCase().includes(q))
   }
 
   if (selectedFilters.value.genre) {
@@ -221,8 +230,12 @@ const filteredUsers = computed(() => {
   const q = searchQuery.value.toLowerCase()
 
   return allUsers.value
-    .filter(u => u.username?.toLowerCase().includes(q))
-    .sort((a, b) => (a.username || '').localeCompare(b.username || ''))
+    .filter(u => u && u.username && u.username.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const usernameA = a?.username || ''
+      const usernameB = b?.username || ''
+      return usernameA.localeCompare(usernameB)
+    })
 })
 
 // --- APLICAR FILTROS ---
