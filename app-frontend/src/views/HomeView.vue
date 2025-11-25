@@ -111,16 +111,15 @@ onMounted(async () => {
   loading.value = true
   try {
     const moviesRes = await axios.get(withApiBase('/movies/'))
-    allMovies.value = Array.isArray(moviesRes.data) ? moviesRes.data : []
+    allMovies.value = moviesRes.data
   } catch (err) {
     console.error('Error loading movies:', err)
     error.value = 'Failed to load movies. Please try again later.'
-    allMovies.value = []
   }
 
   try {
     const usersRes = await axios.get(withApiBase('/api/users/'))
-    allUsers.value = Array.isArray(usersRes.data) ? usersRes.data : []
+    allUsers.value = usersRes.data
   } catch (err) {
     console.error('Error loading users:', err)
     allUsers.value = []
@@ -131,9 +130,6 @@ onMounted(async () => {
 
 // --- GENERAR LISTAS DINÁMICAS ---
 const availableGenres = computed(() => {
-  if (!Array.isArray(allMovies.value)) {
-    return []
-  }
   const genres = new Set()
   allMovies.value.forEach(movie => {
     if (movie.genres && Array.isArray(movie.genres)) {
@@ -144,9 +140,6 @@ const availableGenres = computed(() => {
 })
 
 const availableYears = computed(() => {
-  if (!Array.isArray(allMovies.value)) {
-    return []
-  }
   const years = allMovies.value
     .map(m => parseInt(m.startYear))
     .filter(y => !isNaN(y))
@@ -158,14 +151,11 @@ const availableYears = computed(() => {
 
 // --- FILTRADO ---
 const filteredMovies = computed(() => {
-  if (!Array.isArray(allMovies.value)) {
-    return []
-  }
   let result = allMovies.value
 
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
-    result = result.filter(m => m.primaryTitle?.toLowerCase().includes(q))
+    result = result.filter(m => m.primaryTitle.toLowerCase().includes(q))
   }
 
   if (selectedFilters.value.genre) {
@@ -176,13 +166,13 @@ const filteredMovies = computed(() => {
   }
   if (selectedFilters.value.director) {
     result = result.filter(m =>
-      m.director?.toLowerCase().includes(selectedFilters.value.director?.toLowerCase() || '')
+      m.director?.toLowerCase().includes(selectedFilters.value.director.toLowerCase())
     )
   }
   if (selectedFilters.value.actor) {
     result = result.filter(m =>
       m.actors?.some(a =>
-        a?.toLowerCase().includes(selectedFilters.value.actor?.toLowerCase() || '')
+        a.toLowerCase().includes(selectedFilters.value.actor.toLowerCase())
       )
     )
   }
@@ -215,14 +205,11 @@ const filteredMovies = computed(() => {
 // --- FILTRADO USUARIOS ---
 const filteredUsers = computed(() => {
   if (!searchQuery.value.trim()) return []
-  if (!Array.isArray(allUsers.value)) {
-    return []
-  }
   const q = searchQuery.value.toLowerCase()
 
   return allUsers.value
-    .filter(u => u.username?.toLowerCase().includes(q))
-    .sort((a, b) => (a.username || '').localeCompare(b.username || ''))
+    .filter(u => u.username.toLowerCase().includes(q))
+    .sort((a, b) => a.username.localeCompare(b.username))
 })
 
 // --- APLICAR FILTROS ---
