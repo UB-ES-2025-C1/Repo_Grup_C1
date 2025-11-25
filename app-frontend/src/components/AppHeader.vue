@@ -55,8 +55,7 @@ try {
 onMounted(async () => {
   if (isLoggedIn.value) {
     username.value = localStorage.getItem('username');
-    avatarUrl.value = localStorage.getItem('avatarUrl');
-    avatarUrl.value = resolvePhotoSrc(avatarUrl.value);
+    avatarUrl.value = resolvePhotoSrc(localStorage.getItem('avatarUrl'));
 
     if (!username.value || !avatarUrl.value) {
       try {
@@ -68,7 +67,7 @@ onMounted(async () => {
         avatarUrl.value = resolvePhotoSrc(data.photo);
         
         localStorage.setItem('username', username.value);
-        localStorage.setItem('avatarUrl', avatarUrl.value);
+        localStorage.setItem('avatarUrl', data.photo);
       } catch (e) {
         console.error('Error loading user info', e);
       }
@@ -94,6 +93,7 @@ const onProfileUpdated = (ev) => {
 window.addEventListener('profile-updated', onProfileUpdated);
 onUnmounted(() => window.removeEventListener('profile-updated', onProfileUpdated));
 
+// Compute avatar src robustly: prefer rating.user.photo when provided by API.
 function resolvePhotoSrc(photo) {
   if (!photo) return defaultAvatar;
   // If it's already absolute, use as-is
