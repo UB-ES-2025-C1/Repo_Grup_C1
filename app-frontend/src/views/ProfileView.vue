@@ -250,6 +250,7 @@ function cancelChanges() {
   newAvatar.value.value = null;
   newAvatarFile.value = null;
   removeAvatar.value = false;
+  editing.value = false;
 }
 </script>
 
