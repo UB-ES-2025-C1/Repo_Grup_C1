@@ -16,20 +16,100 @@ jobs:
         id: issue_info
         run: |
           ISSUE_TITLE="${{ github.event.issue.title }}"
+          
+          # Extraer USX.X y TaskX del formato "USX.X-TaskX"
+          if [[ "$ISSUE_TITLE" =~ ^([^-]+)-(.*)$ ]]; then
+            US_BRANCH="${BASH_REMATCH[1]}"
+            TASK_BRANCH="${BASH_REMATCH[2]}"
+            echo "us_branch=$US_BRANCH" >> "$GITHUB_OUTPUT"
+            echo "task_branch=$TASK_BRANCH" >> "$GITHUB_OUTPUT"
+            echo "branch_name=${US_BRANCH}-${TASK_BRANCH}" >> "$GITHUB_OUTPUT"
+          else
+            # Si no sigue el formato, usar el título completo como antes
           SAFE_TITLE=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')
-          BRANCH_NAME="${SAFE_TITLE}"
-          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+            echo "branch_name=$SAFE_TITLE" >> "$GITHUB_OUTPUT"
+            echo "us_branch=" >> "$GITHUB_OUTPUT"
+            echo "task_branch=" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Clonar y crear branch
+      - name: Clonar y crear branches
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH_NAME: ${{ steps.issue_info.outputs.branch_name }}
+          US_BRANCH: ${{ steps.issue_info.outputs.us_branch }}
+          TASK_BRANCH: ${{ steps.issue_info.outputs.task_branch }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          git clone --branch develop https://x-access-token:${TOKEN}@github.com/${{ github.repository }} repo
+          git clone https://x-access-token:${TOKEN}@github.com/${{ github.repository }} repo
           cd repo
 
+          # Si tenemos formato USX.X-TaskX
+          if [ -n "$US_BRANCH" ] && [ -n "$TASK_BRANCH" ]; then
+            # Verificar si la rama US existe (con reintentos para evitar race conditions)
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            US_BRANCH_CREATED=false
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              git fetch origin
+              
+              if git show-ref --verify --quiet refs/remotes/origin/${US_BRANCH}; then
+                echo "La rama ${US_BRANCH} ya existe, usándola como base"
+                git checkout -b ${US_BRANCH} origin/${US_BRANCH}
+                US_BRANCH_CREATED=true
+                break
+              else
+                echo "Intentando crear la rama ${US_BRANCH} desde develop (intento $((RETRY_COUNT + 1)))"
+                git checkout develop
+                git pull origin develop
+                git checkout -b ${US_BRANCH}
+                
+                # Intentar hacer push, si falla porque otro workflow la creó, reintentar
+                PUSH_EXIT_CODE=0
+                PUSH_OUTPUT=$(git push origin ${US_BRANCH} 2>&1) || PUSH_EXIT_CODE=$?
+                
+                if [ $PUSH_EXIT_CODE -eq 0 ]; then
+                  echo "Rama ${US_BRANCH} creada exitosamente"
+                  US_BRANCH_CREATED=true
+                  break
+                elif echo "$PUSH_OUTPUT" | grep -qiE "already exists|remote.*already|cannot push"; then
+                  echo "La rama ${US_BRANCH} fue creada por otro workflow, reintentando..."
+                  RETRY_COUNT=$((RETRY_COUNT + 1))
+                  sleep 1
+                  continue
+                else
+                  echo "Error al crear la rama ${US_BRANCH}, reintentando..."
+                  echo "Output: $PUSH_OUTPUT"
+                  RETRY_COUNT=$((RETRY_COUNT + 1))
+                  sleep 1
+                fi
+              fi
+            done
+            
+            if [ "$US_BRANCH_CREATED" = false ]; then
+              echo "Error: No se pudo crear o acceder a la rama ${US_BRANCH} después de $MAX_RETRIES intentos"
+              exit 1
+            fi
+            
+            # Asegurarse de estar en la rama US antes de crear TaskX
+            git checkout ${US_BRANCH}
+            git pull origin ${US_BRANCH} || true
+            
+            # Crear la rama TaskX desde USX.X
+            echo "Creando la rama ${TASK_BRANCH} desde ${US_BRANCH}"
+            git checkout -b ${TASK_BRANCH}
+            
+            # Si el push falla porque la rama TaskX ya existe, es un error (no debería pasar)
+            if ! git push origin ${TASK_BRANCH}; then
+              echo "Error: La rama ${TASK_BRANCH} ya existe o hubo un problema al crearla"
+              exit 1
+            fi
+          else
+            # Comportamiento original: crear rama desde develop
+            git checkout develop
+            git pull origin develop
           git checkout -b "$BRANCH_NAME"
           git push origin "$BRANCH_NAME"
+          fi
