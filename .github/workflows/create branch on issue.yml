@@ -17,8 +17,9 @@ jobs:
         run: |
           ISSUE_TITLE="${{ github.event.issue.title }}"
           
-          # Extraer USX.X y TaskX del formato "USX.X-TaskX"
-          if [[ "$ISSUE_TITLE" =~ ^([^-]+)-(.*)$ ]]; then
+          # Extraer USX.X y TaskX del formato "USX.X-TaskX" o "USX.X-TaskX - Título"
+          # El regex captura hasta el primer espacio después del guion para ignorar el título descriptivo
+          if [[ "$ISSUE_TITLE" =~ ^([^-]+)-([^[:space:]]+)(.*)?$ ]]; then
             US_BRANCH="${BASH_REMATCH[1]}"
             TASK_BRANCH="${BASH_REMATCH[2]}"
             echo "us_branch=$US_BRANCH" >> "$GITHUB_OUTPUT"
