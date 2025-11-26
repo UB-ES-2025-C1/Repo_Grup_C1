@@ -15,3 +15,12 @@ backend/venv-locust/
 # Database
 backend/db.sqlite3
 *.sqlite3
+
+# NGINX
+# nginx.conf generado dinámicamente (no rastrear)
+app-frontend/nginx.conf
+nginx.conf
+
+# Mantener el template rastreado
+!nginx.conf.template
+!app-frontend/nginx.conf.template
