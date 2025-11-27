@@ -61,11 +61,11 @@ class Movie(models.Model):
         imdb = getattr(self, 'imdb_rating', None) or 0.0
 
         # If no local ratings, return imdb rating (if present)
-        if not avg_local:
+        if avg_local is None:
             return round(imdb, 1) if imdb else 0
 
         # If imdb rating is not provided (0), return local average
-        if not imdb:
+        if imdb is None:
             return round(avg_local, 1) if avg_local is not None else 0
 
         combined = (imdb * 0.5) + (avg_local * 0.5)

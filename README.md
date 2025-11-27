@@ -145,3 +145,8 @@ La configuración de Cypress se encuentra en `app-frontend/cypress.config.js`:
 
 - `baseUrl`: Configurado para `http://localhost:5173` (puerto por defecto de Vite)
 - Los intercepts de las peticiones API se configuran en cada test individual
+
+#### Servidor SSE (Server Side Events)
+
+uvicorn movies.server:app --reload --host 0.0.0.0 --port 8001
+docker run --name redis-sse -p 6379:6379 -d redis
