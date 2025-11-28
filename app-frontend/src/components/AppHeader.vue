@@ -16,7 +16,7 @@
           </slot>
           <router-link to="/profile"><button class="profile-btn">
             <span>{{ username }}</span>
-            <img :src="avatarUrl" alt="Avatar" class="avatar" />
+            <img :src="avatarUrl || defaultAvatar" alt="Avatar" class="avatar" />
           </button></router-link>
         </template>
 
@@ -80,10 +80,8 @@ const onProfileUpdated = (ev) => {
   try {
     const photo = ev && ev.detail && ev.detail.photo_url;
     const name = ev && ev.detail && ev.detail.username;
-    if (photo) {
-      avatarUrl.value = resolvePhotoSrc(photo);
-      localStorage.setItem('avatarUrl', photo);
-    }
+    avatarUrl.value = resolvePhotoSrc(photo);
+    localStorage.setItem('avatarUrl', photo || defaultAvatar);
     if (name) username.value = name;
   } catch (e) {
     // ignore
