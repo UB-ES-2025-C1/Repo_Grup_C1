@@ -352,7 +352,6 @@ class RatingSerializer(serializers.ModelSerializer):
             },
             'new_movie': movie_serializer.data,
         }
-        print(event)
         publish_sse(channel, event)
 
         return rating
