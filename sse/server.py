@@ -18,12 +18,12 @@ from redis import asyncio as aioredis
 BASE_DIR = Path(__file__).resolve().parent
 SUBSCRIPTIONS_FILE = BASE_DIR / "subscriptions.json"
 
-SSE_PREFIX = os.getenv("SSE_PREFIX", "/see")
+SSE_PREFIX = os.getenv("SSE_PREFIX", "/sse")
 STREAM_PATH = f"{SSE_PREFIX}/stream"
 SUBSCRIBE_PATH = f"{SSE_PREFIX}/subscribe"
 UNSUBSCRIBE_PATH = f"{SSE_PREFIX}/unsubscribe"
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
 # ------------------------------
 # Estado del servidor

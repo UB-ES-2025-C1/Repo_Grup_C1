@@ -38,8 +38,9 @@ services:
       - .env
     environment:
       REDIS_URL: redis://redis:6379
-    ports:
-      - "8001:8001"
+      SSE_PREFIX: ${SSE_PREFIX:-/sse}
+    expose:
+      - "8001"
     networks:
       web:
         aliases:
