@@ -119,28 +119,13 @@ class Rating(models.Model):
     cinematography = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
     plot = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
 
+    # Comentario del usuario
     comment = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f'{self.movie} - {self.user.username}: {self.overall_score}'
     
-class Comment(models.Model):
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='comments')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    text = models.TextField()
-    
-    # Fechas
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        # Restricción: Un usuario solo puede tener un comentario por película
-        unique_together = ('movie', 'user')
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'Comment by {self.user.username} on {self.movie}'
-    
 def avatar_upload_path(instance, filename):
     '''
     Devuelve el path donde subir la foto de perfil segun el usuario.
