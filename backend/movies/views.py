@@ -8,9 +8,10 @@ from .serializers import UserRegisterSerializer, UserLoginSerializer, MovieSeria
 from django.db.models import Avg
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import permissions, generics
-from .models import Profile
-from .serializers import UserProfileSerializer, ProfileUpdateSerializer
+from .models import Profile, Comment
+from .serializers import UserProfileSerializer, ProfileUpdateSerializer, CommentSerializer
 from rest_framework.decorators import api_view
+from rest_framework import status
 
 
 
@@ -214,3 +215,63 @@ def get_all_users(request):
     
     serializer = UserProfileSerializer(profiles, many=True)
     return Response(serializer.data)
+
+class MovieCommentsListAPIView(generics.ListAPIView):
+    """
+    Lista los comentarios RAÍZ de una película.
+    Las respuestas vienen anidadas dentro de cada comentario.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        tconst = self.kwargs.get('tconst')
+        # Filtramos parent__isnull=True para obtener solo los hilos principales
+        return Comment.objects.filter(
+            movie__tconst=tconst, 
+            parent__isnull=True
+        ).select_related('user', 'user__profile').prefetch_related('replies', 'replies__user', 'replies__user__profile')
+
+
+class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.CreateAPIView):
+    """
+    Gestiona comentarios.
+    - Si se llama con GET/PATCH/DELETE a .../comments/ttXXXX/: Gestiona TU comentario RAÍZ de esa peli.
+    - Si se llama con POST: Permite crear comentarios raíz O respuestas.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        # Obtiene TU comentario principal sobre la película (no respuestas)
+        tconst = self.kwargs.get('tconst')
+        user = self.request.user
+        movie = get_object_or_404(Movie, tconst=tconst)
+        
+        # Buscamos solo el comentario raíz (parent=None)
+        obj = get_object_or_404(Comment, movie=movie, user=user, parent__isnull=True)
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+    def create(self, request, *args, **kwargs):
+        tconst = self.kwargs.get('tconst')
+        movie = get_object_or_404(Movie, tconst=tconst)
+        
+        # Verificamos si envían parent_id (es una respuesta)
+        parent_id = request.data.get('parent_id')
+
+        if not parent_id:
+            # Es un comentario raíz. Verificamos si ya existe uno (UniqueConstraint lo pararía, pero mejor avisar antes).
+            if Comment.objects.filter(movie=movie, user=request.user, parent__isnull=True).exists():
+                return Response(
+                    {"detail": "Ya has comentado esta película. Usa PATCH para editar tu reseña principal."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        data = request.data.copy()
+        data['movie_tconst'] = tconst
+        
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

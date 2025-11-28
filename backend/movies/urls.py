@@ -6,7 +6,8 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     UserRegisterAPIView, UserLoginAPIView, MovieListAPIView, 
     MovieDetailAPIView, RatingCreateAPIView, UserMovieRatingAPIView,
-    UserProfileDetailAPIView, MyProfileAPIView, UserRatingsListAPIView, MovieRatingsListAPIView,get_all_users
+    UserProfileDetailAPIView, MyProfileAPIView, UserRatingsListAPIView, MovieRatingsListAPIView,get_all_users,
+    MovieCommentsListAPIView,  UserMovieCommentAPIView
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -23,4 +24,6 @@ urlpatterns = [
     path('ratings/<str:tconst>/', UserMovieRatingAPIView.as_view(), name='rating-user-movie'),
     path('<str:tconst>/ratings/', MovieRatingsListAPIView.as_view(), name='movie-ratings-list'),
     path('<str:tconst>/', MovieDetailAPIView.as_view(), name='movie-detail'),
+    path('<str:tconst>/comments/', MovieCommentsListAPIView.as_view(), name='movie-comments-list'),
+    path('comments/<str:tconst>/', UserMovieCommentAPIView.as_view(), name='user-movie-comment')
 ]

@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.db.models import Avg
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models import Avg
+from django.db.models import Q 
 
 
 class Movie(models.Model):
@@ -119,9 +120,7 @@ class Rating(models.Model):
     cinematography = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
     plot = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(10)])
 
-    # Comentario del usuario
-    comment = models.TextField(null=True, blank=True)
-
+    
     def __str__(self):
         return f'{self.movie} - {self.user.username}: {self.overall_score}'
     
@@ -167,3 +166,33 @@ class Profile(models.Model):
             pass
 
         super().save(*args, **kwargs)
+
+class Comment(models.Model):
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    text = models.TextField()
+    
+    # Si es null, es un comentario raíz (opinión de la peli).
+    # Si tiene valor, es una respuesta a otro comentario.
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+        
+        # AÑADIMOS una restricción condicional:
+        # Un usuario solo puede tener UN comentario por película SI parent es NULL (comentario raíz).
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'movie'], 
+                condition=Q(parent__isnull=True), 
+                name='unique_root_comment_per_user'
+            )
+        ]
+
+    def __str__(self):
+        if self.parent:
+            return f'Reply by {self.user.username} to comment {self.parent.id}'
+        return f'Comment by {self.user.username} on {self.movie}'

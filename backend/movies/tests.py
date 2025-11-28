@@ -2,6 +2,7 @@
 Simple tests for the movies app.
 - TestMovieModel: unit tests for Movie.average_rating
 - TestRatingAPI: small API tests for creating/updating a Rating via the /movies/ratings/ endpoint
+- TestCommentAPI: tests for hierarchical comments (root vs replies)
 
 Run with:
 	python manage.py test movies
@@ -14,7 +15,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 
-from .models import Movie, Rating, Profile
+from .models import Movie, Rating, Profile, Comment
 
 
 class TestMovieGetAPI(APITestCase):
@@ -206,8 +207,7 @@ class TestRatingAPI(APITestCase):
 			"soundtrack": 7,
 			"acting": 9,
 			"cinematography": 8,
-			"plot": 8,
-			"comment": "Great!"
+			"plot": 8
 		}
 
 		# Without authentication -> expect 401 or 403 depending on config
@@ -224,8 +224,7 @@ class TestRatingAPI(APITestCase):
 			"soundtrack": 7,
 			"acting": 9,
 			"cinematography": 8,
-			"plot": 8,
-			"comment": "Great!"
+			"plot": 8
 		}
 
 		resp = self.client.post(self.ratings_url, payload, format='json')
@@ -258,8 +257,7 @@ class TestRatingAPI(APITestCase):
 			soundtrack=6,
 			acting=8,
 			cinematography=7,
-			plot=7,
-			comment="Good"
+			plot=7
 		)
 
 		self.client.force_authenticate(user=self.user)
@@ -332,7 +330,7 @@ class TestProfileAPI(APITestCase):
         
         # We also test with the PATCH method.
         response_patch = self.client.patch(url, {'bio': 'attempt'}, format='json')
-        self.assertEqual(response_patch.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_authenticated_user_can_view_own_profile(self):
         """Tests that a logged-in user can make a GET request to /profiles/me/."""
@@ -557,4 +555,106 @@ class TestUserSearchAPI(APITestCase):
             self.assertIn('bio', item)
             self.assertIn('photo', item)
             self.assertIn('average_rating', item)
-            
+
+class TestCommentAPI(APITestCase):
+    """
+    Tests for Hierarchical Comments (Threaded Comments)
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.user1 = User.objects.create_user(username="u1", email="u1@test.com", password="pw")
+        self.user2 = User.objects.create_user(username="u2", email="u2@test.com", password="pw")
+        self.movie = Movie.objects.create(tconst="tt999999", primary_title="Comment Test Movie")
+        
+        # CORRECCIÓN: Añadido el prefijo '/movies/' a las URLs
+        self.manage_url = f'/movies/comments/{self.movie.tconst}/'
+        self.list_url = f'/movies/{self.movie.tconst}/comments/'
+
+    def test_create_root_comment(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {"text": "Root comment by u1"}
+        resp = self.client.post(self.manage_url, payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Comment.objects.count(), 1)
+        c = Comment.objects.first()
+        self.assertIsNone(c.parent)
+        self.assertEqual(c.text, "Root comment by u1")
+
+    def test_duplicate_root_comment_fails(self):
+        self.client.force_authenticate(user=self.user1)
+        # First creation
+        self.client.post(self.manage_url, {"text": "First"}, format='json')
+        # Second creation attempt
+        resp = self.client.post(self.manage_url, {"text": "Second"}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        # Should still be 1 comment
+        self.assertEqual(Comment.objects.count(), 1)
+
+    def test_create_reply_allowed_even_if_root_exists(self):
+        """
+        User can create a reply even if they already have a root comment on the same movie.
+        """
+        self.client.force_authenticate(user=self.user1)
+        # 1. Create root comment by User 1
+        r1 = self.client.post(self.manage_url, {"text": "Root"}, format='json')
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        root_id = r1.data['id']
+
+        # 2. Create reply by User 1 pointing to their own root
+        payload = {"text": "Reply to myself", "parent_id": root_id}
+        resp = self.client.post(self.manage_url, payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        
+        self.assertEqual(Comment.objects.count(), 2)
+        
+        # CAMBIO: Con orden 'created_at' (Ascendente), el último objeto 
+        # es el más reciente (la respuesta).
+        reply = Comment.objects.last()
+        
+        self.assertEqual(reply.text, "Reply to myself")
+        self.assertIsNotNone(reply.parent)
+        self.assertEqual(reply.parent.id, root_id)
+        
+    def test_get_comments_tree_structure(self):
+        # Setup: Root by U1, Reply by U2 to Root
+        c1 = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
+        c2 = Comment.objects.create(user=self.user2, movie=self.movie, text="Reply", parent=c1)
+
+        resp = self.client.get(self.list_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        # Expect list of length 1 (only root comments at top level)
+        self.assertEqual(len(resp.data), 1)
+        root_data = resp.data[0]
+        self.assertEqual(root_data['id'], c1.id)
+        
+        # Check nested replies
+        self.assertIn('replies', root_data)
+        self.assertEqual(len(root_data['replies']), 1)
+        reply_data = root_data['replies'][0]
+        self.assertEqual(reply_data['id'], c2.id)
+        self.assertEqual(reply_data['text'], "Reply")
+
+    def test_update_root_comment(self):
+        Comment.objects.create(user=self.user1, movie=self.movie, text="Original")
+        self.client.force_authenticate(user=self.user1)
+        
+        payload = {"text": "Updated"}
+        resp = self.client.patch(self.manage_url, payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        self.user1.refresh_from_db()
+        # Fetch comment again
+        c = Comment.objects.get(user=self.user1, movie=self.movie)
+        self.assertEqual(c.text, "Updated")
+
+    def test_delete_root_comment(self):
+        c = Comment.objects.create(user=self.user1, movie=self.movie, text="To delete")
+        # Add a reply to verify cascade delete (optional check)
+        Comment.objects.create(user=self.user2, movie=self.movie, text="Reply", parent=c)
+        
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.delete(self.manage_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+        
+        self.assertEqual(Comment.objects.count(), 0)

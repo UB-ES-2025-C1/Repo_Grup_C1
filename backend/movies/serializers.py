@@ -9,7 +9,7 @@ from .models import Rating
 from rest_framework.exceptions import ValidationError
 from axes.handlers.database import AxesDatabaseHandler
 from .models import Profile
-    
+from .models import Comment
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     # El usuario es obligatorio, único y no puede estar vacío
@@ -243,7 +243,66 @@ class MovieMiniSerializer(serializers.ModelSerializer):
         model = Movie
         fields = ['tconst', 'primary_title', 'start_year', 'poster_path']
 
+class CommentSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    user_photo = serializers.SerializerMethodField()
+    
+    # Campo de escritura para indicar si es respuesta
+    parent_id = serializers.PrimaryKeyRelatedField(
+        queryset=Comment.objects.all(), source='parent', write_only=True, required=False, allow_null=True
+    )
+    
+    # Campo de lectura para ver las respuestas anidadas (Recursivo básico)
+    replies = serializers.SerializerMethodField()
 
+    # Campo de escritura para la película
+    movie_tconst = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = Comment
+        fields = [
+            'id', 'username', 'user_photo', 'text', 
+            'created_at', 'updated_at', 
+            'movie_tconst', 'parent_id', 'replies'
+        ]
+        read_only_fields = ['id', 'username', 'user_photo', 'created_at', 'updated_at', 'replies']
+
+    def get_user_photo(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.photo:
+            try:
+                return obj.user.profile.photo.url
+            except ValueError:
+                return None
+        return None
+
+    def get_replies(self, obj):
+        # Esto serializa las respuestas hijas. 
+        # Nota: Si hay muchas respuestas, esto puede ser lento (N+1 queries).
+        # Para optimizar se usa prefetch_related en la vista.
+        if obj.replies.exists():
+            return CommentSerializer(obj.replies.all(), many=True, context=self.context).data
+        return []
+
+    def create(self, validated_data):
+        tconst = validated_data.pop('movie_tconst', None)
+        user = self.context['request'].user
+        
+        # Lógica para asociar película
+        if tconst:
+            try:
+                movie = Movie.objects.get(tconst=tconst)
+                validated_data['movie'] = movie
+            except Movie.DoesNotExist:
+                raise serializers.ValidationError("Movie not found")
+        elif validated_data.get('parent'):
+            # Si es una respuesta y no envían tconst, heredamos la peli del padre
+            validated_data['movie'] = validated_data['parent'].movie
+        else:
+            raise serializers.ValidationError("Movie tconst required for root comments")
+
+        validated_data['user'] = user
+        return super().create(validated_data)
+    
 class RatingSerializer(serializers.ModelSerializer):
     # Accept movie tconst in input (write-only). We look up the Movie in create().
     movie = serializers.CharField(write_only=True)
@@ -267,7 +326,6 @@ class RatingSerializer(serializers.ModelSerializer):
             'acting',
             'cinematography',
             'plot',
-            'comment',
             'date',
         ]
 
@@ -320,7 +378,7 @@ class RatingSerializer(serializers.ModelSerializer):
         existing = Rating.objects.filter(movie=movie, user=user).first()
         if existing:
             # Update only known fields on existing rating instead of creating a duplicate
-            updatable = ['overall_score', 'soundtrack', 'acting', 'cinematography', 'plot', 'comment']
+            updatable = ['overall_score', 'soundtrack', 'acting', 'cinematography', 'plot']
             for attr in updatable:
                 if attr in validated_data:
                     setattr(existing, attr, validated_data[attr])
