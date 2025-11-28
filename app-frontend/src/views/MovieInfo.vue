@@ -71,11 +71,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onBeforeUnmount } from 'vue';
 import AppHeader from '@/components/AppHeader.vue'
 import CommentCard from '@/components/CommentCard.vue'
 import axios from 'axios';
 import { withApiBase } from '@/utils/api';
+import { withSseBase } from '@/utils/sse';
 
 // Funció helper per construir la URL de la imatge
 const getImageUrl = (posterPath) => {
@@ -118,6 +119,10 @@ const deleteError = ref(null);
 const deleteSuccess = ref(null);
 const commentDeleteError = ref(null);
 const commentDeleteSuccess = ref(null);
+
+// SSE
+let sse = null;
+let clientId = localStorage.getItem('sse_client_id');
 
 // 3. Cuando el componente se monta, llamamos a la API
 onMounted(async () => {
@@ -170,6 +175,8 @@ onMounted(async () => {
         });
         comments.value = fetched;
         commentsAll.value = fetched;
+
+        subscribeToMovie();
       } catch (cErr) {
         // non-fatal: just keep comments empty
         console.warn('Could not fetch comments for movie', cErr);
@@ -181,6 +188,10 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+});
+
+onBeforeUnmount(() => {
+  unsubscribeFromMovie();
 });
 
 async function deleteRating() {
@@ -272,6 +283,54 @@ async function deleteComment() {
       commentDeleteError.value = 'Error removing comment.';
     }
   }
+}
+
+function subscribeToMovie() {
+  sse = new EventSource(withSseBase('/sse/stream'));
+
+  sse.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log(data);
+
+      if (data.type === 'client_id') {
+        clientId = data.client_id;
+        localStorage.setItem('sse_client_id', clientId);
+
+        axios.post(`${withSseBase('/sse/subscribe')}/movie:${tconst}`, { client_id: clientId })
+          .catch(console.warn);
+        return;
+      }
+
+      if (data.type === 'new_rating' && data.rating?.movie_info?.tconst === tconst) {
+        movie.value = data.new_movie;
+        const index = commentsAll.value.findIndex(r => r.id === data.rating.id);
+        if (index === -1 && data.rating?.comment) commentsAll.value.unshift(data.rating);  //  New rating with comment
+        if (index !== -1 && !data.rating?.comment) commentsAll.value.splice(index, 1);  // Comment removed from existing rating
+        if (index !== -1 && data.rating?.comment) {  // Rating or comment modified but not removed
+          commentsAll.value.splice(index, 1);
+          commentsAll.value.unshift(data.rating);
+        }
+      }
+
+      if (data.type === 'deleted_rating' && data.rating?.movie_info?.tconst === tconst) {
+        movie.value = data.new_movie;
+        const index = commentsAll.value.findIndex(r => r.id === data.rating.id);
+        if (index !== -1) commentsAll.value.splice(index, 1);
+      }
+    } catch (err) {
+      console.error('SSE message parse error', err);
+    }
+  };
+
+  sse.onerror = (err) => console.error('SSE error', err);
+}
+
+function unsubscribeFromMovie() {
+  if (!sse || !clientId) return;
+  axios.post(`${withSseBase('/sse/unsubscribe')}/movie:${tconst}`, { client_id: clientId }).catch(console.warn);
+  sse.close();
+  sse = null;
 }
 </script>
 
