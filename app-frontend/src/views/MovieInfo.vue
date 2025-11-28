@@ -286,7 +286,7 @@ async function deleteComment() {
 }
 
 function subscribeToMovie() {
-  sse = new EventSource(withSseBase('/movies/stream'));
+  sse = new EventSource(withSseBase('/sse/stream'));
 
   sse.onmessage = (event) => {
     try {
@@ -297,7 +297,7 @@ function subscribeToMovie() {
         clientId = data.client_id;
         localStorage.setItem('sse_client_id', clientId);
 
-        axios.post(`${withSseBase('/movies/subscribe')}/movie:${tconst}`, { client_id: clientId })
+        axios.post(`${withSseBase('/sse/subscribe')}/movie:${tconst}`, { client_id: clientId })
           .catch(console.warn);
         return;
       }
@@ -328,7 +328,7 @@ function subscribeToMovie() {
 
 function unsubscribeFromMovie() {
   if (!sse || !clientId) return;
-  axios.post(`${withSseBase('/movies/unsubscribe')}/movie:${tconst}`, { client_id: clientId }).catch(console.warn);
+  axios.post(`${withSseBase('/sse/unsubscribe')}/movie:${tconst}`, { client_id: clientId }).catch(console.warn);
   sse.close();
   sse = null;
 }

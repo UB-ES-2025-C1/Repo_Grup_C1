@@ -9,7 +9,7 @@ import json
 import uuid
 import os
 from pathlib import Path
-import aioredis
+from redis import asyncio as aioredis
 
 # ------------------------------
 # Configuración
@@ -18,10 +18,10 @@ import aioredis
 BASE_DIR = Path(__file__).resolve().parent
 SUBSCRIPTIONS_FILE = BASE_DIR / "subscriptions.json"
 
-SSE_PREFIX = os.getenv("SSE_PREFIX", "")
-STREAM_PATH = f"{SSE_PREFIX}/movies/stream"
-SUBSCRIBE_PATH = f"{SSE_PREFIX}/movies/subscribe"
-UNSUBSCRIBE_PATH = f"{SSE_PREFIX}/movies/unsubscribe"
+SSE_PREFIX = os.getenv("SSE_PREFIX", "/see")
+STREAM_PATH = f"{SSE_PREFIX}/stream"
+SUBSCRIBE_PATH = f"{SSE_PREFIX}/subscribe"
+UNSUBSCRIBE_PATH = f"{SSE_PREFIX}/unsubscribe"
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
