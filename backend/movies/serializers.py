@@ -394,7 +394,6 @@ class RatingSerializer(serializers.ModelSerializer):
                 'acting': rating.acting,
                 'cinematography': rating.cinematography,
                 'plot': rating.plot,
-                'comment': rating.comment,
                 'date': str(rating.date),
             },
             'new_movie': movie_serializer.data,
