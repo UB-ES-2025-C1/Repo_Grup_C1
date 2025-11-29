@@ -8,6 +8,11 @@ Run with:
 	python manage.py test movies
 """
 
+from unittest.mock import patch
+import os
+
+patch.dict(os.environ, {"DISABLE_SSE": "1"}).start()  # Disable redis server for unit tests
+
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile

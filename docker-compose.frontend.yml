@@ -10,6 +10,8 @@ services:
       - .env
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
+      BACKEND_CONTAINER_NAME: ${CONTAINER_NAME_BACKEND:-cinemaub-prod-backend}
+      SSE_CONTAINER_NAME: ${CONTAINER_NAME_SSE:-cinemaub-prod-sse}
     expose:
       - "80"
     networks:

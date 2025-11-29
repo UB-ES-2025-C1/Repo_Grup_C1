@@ -145,3 +145,33 @@ La configuración de Cypress se encuentra en `app-frontend/cypress.config.js`:
 
 - `baseUrl`: Configurado para `http://localhost:5173` (puerto por defecto de Vite)
 - Los intercepts de las peticiones API se configuran en cada test individual
+
+## Servidor redis
+
+### Requisitos previos
+
+- Docker (https://www.docker.com/)
+  - En Windows/Mac se recomienda Docker Desktop.
+- Docker Compose (incluido en Docker Desktop)
+
+### Inicia el servidor redis
+```
+docker run --name redis-sse -p 6379:6379 -d redis
+```
+
+## Terminal del servidor SSE
+
+### Navega al directorio del servidor SSE
+```
+cd sse
+```
+
+### Dependencias del SSE
+```
+pip install -r requirements.txt
+```
+
+### Inicia el servidor SSE
+```
+uvicorn server:app --reload --host 0.0.0.0 --port 8001
+```
