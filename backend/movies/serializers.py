@@ -253,8 +253,7 @@ class CommentSerializer(serializers.ModelSerializer):
     user_photo = serializers.SerializerMethodField()
     
     reply_count = serializers.IntegerField(read_only=True)
-    like_count = serializers.IntegerField(read_only=True)
-    is_liked = serializers.SerializerMethodField()
+
     parent_id = serializers.PrimaryKeyRelatedField(
         queryset=Comment.objects.all(), source='parent', required=False, allow_null=True
     )
@@ -266,7 +265,7 @@ class CommentSerializer(serializers.ModelSerializer):
             'id', 'username', 'user_photo', 'text', 
             'created_at', 'updated_at', 
             'movie_tconst', 'parent_id', 
-            'reply_count', 'like_count', 'is_liked'
+            'reply_count' 
         ]
         read_only_fields = ['id', 'username', 'user_photo', 'created_at', 'updated_at', 'reply_count']
 
@@ -277,15 +276,6 @@ class CommentSerializer(serializers.ModelSerializer):
             except ValueError:
                 return None
         return None
-    def get_is_liked(self, obj):
-        """
-        Devuelve True si el usuario que hace la petición está en la lista de likes.
-        """
-        user = self.context.get('request').user
-        if user and user.is_authenticated:
-            # Optimizamos para evitar querys si ya hemos hecho prefetch en la vista
-            return user in obj.likes.all()
-        return False
 
     def create(self, validated_data):
         tconst = validated_data.pop('movie_tconst', None)

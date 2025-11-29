@@ -219,62 +219,34 @@ def get_all_users(request):
 
 class MovieCommentsListAPIView(generics.ListAPIView):
     """
-    Lista los comentarios RAÍZ.
-    ORDEN: Primero los que tienen más likes, luego los más recientes.
+    Lista los comentarios RAÍZ de una película.
+    NO incluye las respuestas anidadas, solo el número de respuestas (reply_count).
     """
     serializer_class = CommentSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         tconst = self.kwargs.get('tconst')
+        # Filtramos solo los padres y ANOTAMOS (contamos) sus respuestas
         return Comment.objects.filter(
             movie__tconst=tconst, 
             parent__isnull=True
-        ).select_related('user', 'user__profile').prefetch_related('likes').annotate(
-            reply_count=Count('replies', distinct=True),
-            like_count=Count('likes', distinct=True) # Contamos likes
-        ).order_by('-like_count', '-created_at') # <--- ORDEN DESCENDENTE POR LIKES
+        ).select_related('user', 'user__profile').annotate(reply_count=Count('replies'))
 
 
 class CommentRepliesListAPIView(generics.ListAPIView):
     """
-    Lista las respuestas.
-    ORDEN: Cronológico (Ascendente), los likes no afectan al orden aquí.
+    Devuelve solo las respuestas de un comentario específico.
     """
     serializer_class = CommentSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         comment_id = self.kwargs.get('comment_id')
+        # Obtenemos comentarios cuyo padre sea el ID pasado en la URL
         return Comment.objects.filter(
             parent__id=comment_id
-        ).select_related('user', 'user__profile').prefetch_related('likes').annotate(
-            reply_count=Count('replies', distinct=True),
-            like_count=Count('likes', distinct=True)
-        ).order_by('created_at') # <--- ORDEN CRONOLÓGICO ASCENDENTE
-
-
-class CommentLikeToggleAPIView(APIView):
-    """
-    Permite dar o quitar like a un comentario.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, comment_id):
-        comment = get_object_or_404(Comment, pk=comment_id)
-        user = request.user
-
-        if user in comment.likes.all():
-            comment.likes.remove(user)
-            liked = False
-        else:
-            comment.likes.add(user)
-            liked = True
-            
-        return Response({
-            'liked': liked, 
-            'like_count': comment.likes.count()
-        }, status=status.HTTP_200_OK)
+        ).select_related('user', 'user__profile').annotate(reply_count=Count('replies'))
 
 
 class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.CreateAPIView):

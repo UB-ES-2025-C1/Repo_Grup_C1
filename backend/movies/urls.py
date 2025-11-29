@@ -7,7 +7,7 @@ from .views import (
     UserRegisterAPIView, UserLoginAPIView, MovieListAPIView, 
     MovieDetailAPIView, RatingCreateAPIView, UserMovieRatingAPIView,
     UserProfileDetailAPIView, MyProfileAPIView, UserRatingsListAPIView, MovieRatingsListAPIView,get_all_users,
-    MovieCommentsListAPIView,  UserMovieCommentAPIView, CommentRepliesListAPIView, CommentLikeToggleAPIView
+    MovieCommentsListAPIView,  UserMovieCommentAPIView, CommentRepliesListAPIView
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -27,5 +27,4 @@ urlpatterns = [
     path('<str:tconst>/comments/', MovieCommentsListAPIView.as_view(), name='movie-comments-list'),
     path('comments/<int:comment_id>/replies/', CommentRepliesListAPIView.as_view(), name='comment-replies-list'),
     path('comments/<str:tconst>/', UserMovieCommentAPIView.as_view(), name='user-movie-comment'),
-    path('comments/<int:comment_id>/like/', CommentLikeToggleAPIView.as_view(), name='comment-like-toggle'),
 ]

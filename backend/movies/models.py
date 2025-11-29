@@ -175,7 +175,7 @@ class Comment(models.Model):
     # Si es null, es un comentario raíz (opinión de la peli).
     # Si tiene valor, es una respuesta a otro comentario.
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies')
-    likes = models.ManyToManyField(User, related_name='liked_comments', blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
