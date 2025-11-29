@@ -566,7 +566,6 @@ class TestCommentAPI(APITestCase):
         self.user2 = User.objects.create_user(username="u2", email="u2@test.com", password="pw")
         self.movie = Movie.objects.create(tconst="tt999999", primary_title="Comment Test Movie")
         
-        # CORRECCIÓN: Añadido el prefijo '/movies/' a las URLs
         self.manage_url = f'/movies/comments/{self.movie.tconst}/'
         self.list_url = f'/movies/{self.movie.tconst}/comments/'
 
@@ -607,33 +606,49 @@ class TestCommentAPI(APITestCase):
         
         self.assertEqual(Comment.objects.count(), 2)
         
-        # CAMBIO: Con orden 'created_at' (Ascendente), el último objeto 
-        # es el más reciente (la respuesta).
         reply = Comment.objects.last()
         
         self.assertEqual(reply.text, "Reply to myself")
         self.assertIsNotNone(reply.parent)
         self.assertEqual(reply.parent.id, root_id)
-        
-    def test_get_comments_tree_structure(self):
-        # Setup: Root by U1, Reply by U2 to Root
+
+    def test_get_root_comments_has_reply_count(self):
+        """
+        Verifica que al pedir comentarios de la peli, vienen sin anidar
+        pero con el contador 'reply_count'.
+        """
         c1 = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
-        c2 = Comment.objects.create(user=self.user2, movie=self.movie, text="Reply", parent=c1)
+        
+        Comment.objects.create(user=self.user2, movie=self.movie, text="Reply 1", parent=c1)
+        Comment.objects.create(user=self.user2, movie=self.movie, text="Reply 2", parent=c1)
 
         resp = self.client.get(self.list_url, format='json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         
-        # Expect list of length 1 (only root comments at top level)
-        self.assertEqual(len(resp.data), 1)
         root_data = resp.data[0]
         self.assertEqual(root_data['id'], c1.id)
         
-        # Check nested replies
-        self.assertIn('replies', root_data)
-        self.assertEqual(len(root_data['replies']), 1)
-        reply_data = root_data['replies'][0]
-        self.assertEqual(reply_data['id'], c2.id)
-        self.assertEqual(reply_data['text'], "Reply")
+        self.assertNotIn('replies', root_data)
+        
+        self.assertIn('reply_count', root_data)
+        self.assertEqual(root_data['reply_count'], 2)
+
+    def test_get_specific_replies_endpoint(self):
+        """
+        Verifica que podemos pedir las respuestas de un comentario específico en su propio endpoint.
+        """
+        c1 = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
+        c2 = Comment.objects.create(user=self.user2, movie=self.movie, text="Reply A", parent=c1)
+        
+        # URL to see replies: /api/movies/comments/<id>/replies/
+        replies_url = f'/movies/comments/{c1.id}/replies/'
+        
+        resp = self.client.get(replies_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]['text'], "Reply A")
+        self.assertEqual(resp.data[0]['parent_id'], c1.id)
 
     def test_update_root_comment(self):
         Comment.objects.create(user=self.user1, movie=self.movie, text="Original")

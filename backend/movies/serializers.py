@@ -243,19 +243,17 @@ class MovieMiniSerializer(serializers.ModelSerializer):
         model = Movie
         fields = ['tconst', 'primary_title', 'start_year', 'poster_path']
 
+
+
 class CommentSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     user_photo = serializers.SerializerMethodField()
     
-    # Campo de escritura para indicar si es respuesta
-    parent_id = serializers.PrimaryKeyRelatedField(
-        queryset=Comment.objects.all(), source='parent', write_only=True, required=False, allow_null=True
-    )
-    
-    # Campo de lectura para ver las respuestas anidadas (Recursivo básico)
-    replies = serializers.SerializerMethodField()
+    reply_count = serializers.IntegerField(read_only=True)
 
-    # Campo de escritura para la película
+    parent_id = serializers.PrimaryKeyRelatedField(
+        queryset=Comment.objects.all(), source='parent', required=False, allow_null=True
+    )
     movie_tconst = serializers.CharField(write_only=True, required=False)
 
     class Meta:
@@ -263,9 +261,10 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'user_photo', 'text', 
             'created_at', 'updated_at', 
-            'movie_tconst', 'parent_id', 'replies'
+            'movie_tconst', 'parent_id', 
+            'reply_count' 
         ]
-        read_only_fields = ['id', 'username', 'user_photo', 'created_at', 'updated_at', 'replies']
+        read_only_fields = ['id', 'username', 'user_photo', 'created_at', 'updated_at', 'reply_count']
 
     def get_user_photo(self, obj):
         if hasattr(obj.user, 'profile') and obj.user.profile.photo:
@@ -275,19 +274,10 @@ class CommentSerializer(serializers.ModelSerializer):
                 return None
         return None
 
-    def get_replies(self, obj):
-        # Esto serializa las respuestas hijas. 
-        # Nota: Si hay muchas respuestas, esto puede ser lento (N+1 queries).
-        # Para optimizar se usa prefetch_related en la vista.
-        if obj.replies.exists():
-            return CommentSerializer(obj.replies.all(), many=True, context=self.context).data
-        return []
-
     def create(self, validated_data):
         tconst = validated_data.pop('movie_tconst', None)
         user = self.context['request'].user
         
-        # Lógica para asociar película
         if tconst:
             try:
                 movie = Movie.objects.get(tconst=tconst)
@@ -295,7 +285,6 @@ class CommentSerializer(serializers.ModelSerializer):
             except Movie.DoesNotExist:
                 raise serializers.ValidationError("Movie not found")
         elif validated_data.get('parent'):
-            # Si es una respuesta y no envían tconst, heredamos la peli del padre
             validated_data['movie'] = validated_data['parent'].movie
         else:
             raise serializers.ValidationError("Movie tconst required for root comments")
@@ -404,7 +393,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def get_photo(self, obj):
         if obj.photo:
             try:
-                return obj.photo.url  # Esto devuelve '/media/...'
+                return obj.photo.url  
             except ValueError:
                 return None
         return None

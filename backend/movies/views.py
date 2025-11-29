@@ -12,6 +12,7 @@ from .models import Profile, Comment
 from .serializers import UserProfileSerializer, ProfileUpdateSerializer, CommentSerializer
 from rest_framework.decorators import api_view
 from rest_framework import status
+from django.db.models import Count
 
 
 
@@ -219,18 +220,33 @@ def get_all_users(request):
 class MovieCommentsListAPIView(generics.ListAPIView):
     """
     Lista los comentarios RAÍZ de una película.
-    Las respuestas vienen anidadas dentro de cada comentario.
+    NO incluye las respuestas anidadas, solo el número de respuestas (reply_count).
     """
     serializer_class = CommentSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         tconst = self.kwargs.get('tconst')
-        # Filtramos parent__isnull=True para obtener solo los hilos principales
+        # Filtramos solo los padres y ANOTAMOS (contamos) sus respuestas
         return Comment.objects.filter(
             movie__tconst=tconst, 
             parent__isnull=True
-        ).select_related('user', 'user__profile').prefetch_related('replies', 'replies__user', 'replies__user__profile')
+        ).select_related('user', 'user__profile').annotate(reply_count=Count('replies'))
+
+
+class CommentRepliesListAPIView(generics.ListAPIView):
+    """
+    Devuelve solo las respuestas de un comentario específico.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        comment_id = self.kwargs.get('comment_id')
+        # Obtenemos comentarios cuyo padre sea el ID pasado en la URL
+        return Comment.objects.filter(
+            parent__id=comment_id
+        ).select_related('user', 'user__profile').annotate(reply_count=Count('replies'))
 
 
 class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.CreateAPIView):
