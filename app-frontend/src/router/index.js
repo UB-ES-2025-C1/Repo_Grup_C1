@@ -4,6 +4,8 @@ import MovieInfo from '@/views/MovieInfo.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import LoginView from '@/views/LoginView.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import ForumHomeView from '@/views/ForumHomeView.vue'
+import ForumChatView from '@/views/ForumChatView.vue'
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
@@ -35,6 +37,18 @@ const routes = [
     component: ProfileView,
     props: true
   },
+  { 
+    path: '/forums',
+    name: 'forums',
+    component: ForumHomeView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/forums/:id',
+    name: 'forum-chat',
+    component: ForumChatView,
+    meta: { requiresAuth: true }
+  }
 ]
 
 const router = createRouter({
