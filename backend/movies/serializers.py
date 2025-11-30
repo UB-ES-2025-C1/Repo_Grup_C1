@@ -269,6 +269,15 @@ class CommentSerializer(serializers.ModelSerializer):
             'reply_count', 'like_count', 'is_liked'
         ]
         read_only_fields = ['id', 'username', 'user_photo', 'created_at', 'updated_at', 'reply_count']
+    
+    def validate_parent_id(self, value):
+        """
+        Valida que el comentario al que intentas responder sea un comentario raíz.
+        Si 'value' (el padre) ya tiene un 'parent', lanzamos error.
+        """
+        if value is not None and value.parent is not None:
+            raise serializers.ValidationError("No se permiten respuestas anidadas (respuestas de respuestas). Solo puedes responder al comentario principal.")
+        return value
 
     def get_user_photo(self, obj):
         if hasattr(obj.user, 'profile') and obj.user.profile.photo:

@@ -680,7 +680,6 @@ class TestCommentAPI(APITestCase):
         self.assertEqual(Comment.objects.count(), 0)
     
     def test_toggle_like(self):
-        from .models import CommentLike # Importar dentro o arriba
 
         c = Comment.objects.create(user=self.user1, movie=self.movie, text="Like me")
         like_url = f'/movies/comments/{c.id}/like/'
@@ -751,4 +750,23 @@ class TestCommentAPI(APITestCase):
         # Order should be R1 then R2 (Chronological), despite R1 having more likes
         self.assertEqual(resp.data[0]['id'], r1.id)
         self.assertEqual(resp.data[1]['id'], r2.id)
-
+    
+    def test_reply_to_reply_is_forbidden(self):
+        """
+        Verifica que no se puede crear una respuesta a un comentario que ya es una respuesta.
+        """
+        self.client.force_authenticate(user=self.user1)
+        
+        # 1. Crear comentario raíz
+        root = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
+        
+        # 2. Crear respuesta nivel 1 (OK)
+        reply_lvl_1 = Comment.objects.create(user=self.user2, movie=self.movie, text="Reply Lvl 1", parent=root)
+        
+        # 3. Intentar crear respuesta nivel 2 (Debería fallar)
+        payload = {"text": "Reply Lvl 2", "parent_id": reply_lvl_1.id}
+        resp = self.client.post(self.manage_url, payload, format='json')
+        
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        # Verificamos que el mensaje de error es el esperado (opcional)
+        self.assertIn("No se permiten respuestas anidadas", str(resp.data))
