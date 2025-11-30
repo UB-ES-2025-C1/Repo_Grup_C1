@@ -13,6 +13,7 @@ from .models import Comment
 from .notify import publish_sse
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+from .models import Forum, ForumPost
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     # El usuario es obligatorio, único y no puede estar vacío
@@ -488,3 +489,29 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
             except ValueError:
                 return None
         return None
+    
+class ForumPostSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    user_photo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ForumPost
+        fields = ['id', 'username', 'user_photo', 'text', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'username', 'user_photo', 'created_at', 'updated_at']
+
+    def get_user_photo(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.photo:
+            try:
+                return obj.user.profile.photo.url
+            except ValueError:
+                return None
+        return None
+
+class ForumSerializer(serializers.ModelSerializer):
+    creator_username = serializers.CharField(source='creator.username', read_only=True)
+    posts_count = serializers.IntegerField(source='posts.count', read_only=True)
+
+    class Meta:
+        model = Forum
+        fields = ['id', 'title', 'description', 'creator_username', 'created_at', 'updated_at', 'posts_count']
+        read_only_fields = ['id', 'creator_username', 'created_at', 'updated_at', 'posts_count']
