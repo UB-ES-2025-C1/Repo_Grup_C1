@@ -20,7 +20,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 
-from .models import Movie, Rating, Profile, Comment
+from .models import Movie, Rating, Profile, Comment, CommentLike
 
 
 class TestMovieGetAPI(APITestCase):
@@ -680,9 +680,8 @@ class TestCommentAPI(APITestCase):
         self.assertEqual(Comment.objects.count(), 0)
     
     def test_toggle_like(self):
-        """
-        User can like and unlike a comment.
-        """
+        from .models import CommentLike # Importar dentro o arriba
+
         c = Comment.objects.create(user=self.user1, movie=self.movie, text="Like me")
         like_url = f'/movies/comments/{c.id}/like/'
         
@@ -693,14 +692,17 @@ class TestCommentAPI(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(resp.data['liked'])
         self.assertEqual(resp.data['like_count'], 1)
-        self.assertEqual(c.likes.count(), 1)
         
-        # 2. Remove Like (Toggle)
+        # Verificamos que existe el objeto CommentLike
+        self.assertTrue(CommentLike.objects.filter(comment=c, user=self.user2).exists())
+        
+        # 2. Remove Like
         resp = self.client.post(like_url, format='json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertFalse(resp.data['liked'])
         self.assertEqual(resp.data['like_count'], 0)
-        self.assertEqual(c.likes.count(), 0)
+        
+        self.assertFalse(CommentLike.objects.filter(comment=c, user=self.user2).exists())
 
     def test_root_comments_ordering_by_likes(self):
         """
@@ -714,7 +716,9 @@ class TestCommentAPI(APITestCase):
         u3 = User.objects.create_user(username="u3", email="u3@t.com", password="p")
         
         # C2 gets 2 likes
-        c2.likes.add(self.user1, u3)
+        CommentLike.objects.create(comment=c2, user=self.user1)
+        CommentLike.objects.create(comment=c2, user=u3)
+        
         # C1 gets 0 likes
         
         # Fetch list
@@ -731,9 +735,12 @@ class TestCommentAPI(APITestCase):
         """
         root = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
         
-        # Create Reply 1 (Oldest) - 100 Likes (should not move up)
+        # Create Reply 1 (Oldest)
         r1 = Comment.objects.create(user=self.user1, movie=self.movie, text="Reply 1", parent=root)
-        r1.likes.add(self.user1, self.user2) # 2 likes
+        
+        # r1 gets 2 likes (should not move up because replies are chronological)
+        CommentLike.objects.create(comment=r1, user=self.user1)
+        CommentLike.objects.create(comment=r1, user=self.user2)
         
         # Create Reply 2 (Newest) - 0 Likes
         r2 = Comment.objects.create(user=self.user2, movie=self.movie, text="Reply 2", parent=root)

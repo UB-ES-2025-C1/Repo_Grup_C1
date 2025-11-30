@@ -13,6 +13,7 @@ from .serializers import UserProfileSerializer, ProfileUpdateSerializer, Comment
 from rest_framework.decorators import api_view
 from rest_framework import status
 from django.db.models import Count
+from .models import CommentLike
 
 
 
@@ -233,7 +234,7 @@ class MovieCommentsListAPIView(generics.ListAPIView):
         ).select_related('user', 'user__profile').prefetch_related('likes').annotate(
             reply_count=Count('replies', distinct=True),
             like_count=Count('likes', distinct=True) # Contamos likes
-        ).order_by('-like_count', '-created_at') # <--- ORDEN DESCENDENTE POR LIKES
+        ).order_by('-like_count', 'created_at') # <--- ORDEN ASCENDENTE POR LIKES
 
 
 class CommentRepliesListAPIView(generics.ListAPIView):
@@ -319,3 +320,28 @@ class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.Cr
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+class CommentLikeToggleAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, comment_id):
+        comment = get_object_or_404(Comment, pk=comment_id)
+        user = request.user
+
+        # Buscamos si ya existe el like
+        existing_like = CommentLike.objects.filter(comment=comment, user=user).first()
+
+        if existing_like:
+            # Si existe, lo borramos (Quitar Like)
+            existing_like.delete()
+            liked = False
+        else:
+            # Si no existe, lo creamos (Dar Like)
+            CommentLike.objects.create(comment=comment, user=user)
+            liked = True
+            
+        # Contamos usando el related_name 'likes'
+        return Response({
+            'liked': liked, 
+            'like_count': comment.likes.count()
+        }, status=status.HTTP_200_OK)

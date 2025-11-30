@@ -278,13 +278,11 @@ class CommentSerializer(serializers.ModelSerializer):
                 return None
         return None
     def get_is_liked(self, obj):
-        """
-        Devuelve True si el usuario que hace la petición está en la lista de likes.
-        """
         user = self.context.get('request').user
         if user and user.is_authenticated:
-            # Optimizamos para evitar querys si ya hemos hecho prefetch en la vista
-            return user in obj.likes.all()
+            # Antes: return user in obj.likes.all()
+            # Ahora: Buscamos si existe el objeto CommentLike
+            return obj.likes.filter(user=user).exists()
         return False
 
     def create(self, validated_data):

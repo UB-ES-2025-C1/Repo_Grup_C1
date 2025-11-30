@@ -175,7 +175,7 @@ class Comment(models.Model):
     # Si es null, es un comentario raíz (opinión de la peli).
     # Si tiene valor, es una respuesta a otro comentario.
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies')
-    likes = models.ManyToManyField(User, related_name='liked_comments', blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -196,3 +196,19 @@ class Comment(models.Model):
         if self.parent:
             return f'Reply by {self.user.username} to comment {self.parent.id}'
         return f'Comment by {self.user.username} on {self.movie}'
+    
+class CommentLike(models.Model):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='likes')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comment_likes')
+    created_at = models.DateTimeField(auto_now_add=True) # <--- La gran ventaja
+
+    class Meta:
+        # Un usuario solo puede dar un like por comentario
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'comment'], name='unique_like_per_user')
+        ]
+        # Opcional: Para obtener los likes más recientes primero
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.username} likes comment {self.comment.id}'
