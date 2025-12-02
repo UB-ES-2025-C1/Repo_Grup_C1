@@ -1,0 +1,90 @@
+name: Cypress E2E Tests
+
+on:
+  push:
+    branches: [ main, develop, pre-prod ]
+  pull_request:
+    branches: [ main, develop, pre-prod ]
+  workflow_dispatch:  # Permite ejecución manual desde GitHub
+
+jobs:
+  cypress-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DISABLE_SSE: "1"
+        run: python manage.py migrate
+
+      - name: Start backend server
+        working-directory: backend
+        env:
+          DISABLE_SSE: "1"
+          DEBUG: "True"
+        run: |
+          python manage.py runserver 8000 &
+          echo "Backend server starting..."
+          sleep 5
+          # Wait for backend to be ready
+          timeout 30 bash -c 'until curl -f http://localhost:8000/movies/ 2>/dev/null; do sleep 1; done' || exit 1
+          echo "Backend server is ready"
+
+      - name: Install frontend dependencies
+        working-directory: app-frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: app-frontend
+        env:
+          VITE_API_BASE_URL: "http://127.0.0.1:8000"
+        run: npm run build
+
+      - name: Start frontend server
+        working-directory: app-frontend
+        run: |
+          npm run preview -- --port 5173 --host 0.0.0.0 &
+          echo "Frontend server starting..."
+          sleep 5
+          # Wait for frontend to be ready
+          timeout 30 bash -c 'until curl -f http://localhost:5173/ 2>/dev/null; do sleep 1; done' || exit 1
+          echo "Frontend server is ready"
+
+      - name: Run Cypress tests
+        working-directory: app-frontend
+        run: npm run cypress:run
+
+      - name: Upload Cypress screenshots
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: cypress-screenshots
+          path: app-frontend/cypress/screenshots
+
+      - name: Upload Cypress videos
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: cypress-videos
+          path: app-frontend/cypress/videos
+
