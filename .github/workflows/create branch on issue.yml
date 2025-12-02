@@ -17,11 +17,18 @@ jobs:
         run: |
           ISSUE_TITLE="${{ github.event.issue.title }}"
           
-          # Extraer USX.X y TaskX del formato "USX.X-TaskX" o "USX.X-TaskX - Título"
-          # El regex captura hasta el primer espacio después del guion para ignorar el título descriptivo
-          if [[ "$ISSUE_TITLE" =~ ^([^-]+)-([^[:space:]]+)(.*)?$ ]]; then
+          # Extraer USX.X y TaskX-Título del formato "USX.X-TaskX - Título"
+          # Captura USX.X hasta el primer guion, y el resto (TaskX - Título) como nombre completo de la task
+          if [[ "$ISSUE_TITLE" =~ ^([^-]+)-(.*)$ ]]; then
             US_BRANCH="${BASH_REMATCH[1]}"
-            TASK_BRANCH="${BASH_REMATCH[2]}"
+            TASK_FULL="${BASH_REMATCH[2]}"
+            
+            # Limpiar el nombre de la task para que sea válido como nombre de rama
+            # Reemplazar espacios múltiples por uno solo, trim espacios al inicio/fin, reemplazar espacios por guiones
+            TASK_FULL=$(echo "$TASK_FULL" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/[[:space:]]\+/-/g')
+            # Eliminar caracteres no válidos para nombres de rama (mantener letras, números, guiones y guiones bajos)
+            TASK_BRANCH=$(echo "$TASK_FULL" | sed 's/[^a-zA-Z0-9_-]//g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+            
             echo "us_branch=$US_BRANCH" >> "$GITHUB_OUTPUT"
             echo "task_branch=$TASK_BRANCH" >> "$GITHUB_OUTPUT"
             echo "branch_name=${US_BRANCH}-${TASK_BRANCH}" >> "$GITHUB_OUTPUT"
