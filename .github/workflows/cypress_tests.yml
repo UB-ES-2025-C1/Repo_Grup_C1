@@ -37,6 +37,12 @@ jobs:
           DISABLE_SSE: "1"
         run: python manage.py migrate
 
+      - name: Load test data
+        working-directory: backend
+        env:
+          DISABLE_SSE: "1"
+        run: python manage.py load_movies_enriched --copy-images
+
       - name: Start backend server
         working-directory: backend
         env:
