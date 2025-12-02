@@ -96,7 +96,6 @@ onMounted(async () => {
 
     // Try to fetch user's rating for this movie
     const token = getAccessToken();
-    console.log('Access token:', token);
     if (!token) {
       // Not authenticated - redirect to login and replace history so back returns to movie page
       console.log('No access token found');
@@ -110,12 +109,12 @@ onMounted(async () => {
 
     // Prefill form with existing rating
     const data = resp.data;
-    form.value.overall_score = data.overall_score || form.value.overall_score;
-    form.value.soundtrack = data.soundtrack || 0;
-    form.value.acting = data.acting || 0;
-    form.value.cinematography = data.cinematography || 0;
-    form.value.plot = data.plot || 0;
-    form.value.comment = data.comment || '';
+    form.value.overall_score = data.overall_score ?? form.value.overall_score;
+    form.value.soundtrack = data.soundtrack ?? 0;
+    form.value.acting = data.acting ?? 0;
+    form.value.cinematography = data.cinematography ?? 0;
+    form.value.plot = data.plot ?? 0;
+    form.value.comment = data.comment ?? '';
 
   } catch (err) {
     if (err.response && err.response.status === 404) {
