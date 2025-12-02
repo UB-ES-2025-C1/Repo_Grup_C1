@@ -2,6 +2,7 @@
   <div class="card" @click="goToForum">
     <div class="meta">
       <h3>{{ forum.title }}</h3>
+      <p>{{ forum.description }}</p>
     </div>
 
     <button class="empty" @click.stop="changeJoinStatus">{{ joinStatus }}</button>
@@ -58,7 +59,7 @@ async function changeJoinStatus() {
 .card {
   position: relative;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
   padding: 1rem;
   border: 1px solid #ccc;
@@ -66,12 +67,24 @@ async function changeJoinStatus() {
   cursor: pointer;
 }
 
-button.empty {
+.meta {
+  width: 100%;
+  flex: 0 1 auto;
+}
+
+
+.empty {
   padding: 0.4rem 0.8rem;
   border: none;
   border-radius: 6px;
   background-color: #3b82f6;
   color: white;
   cursor: pointer;
+  margin-top: auto;
+  align-self: flex-end;
+}
+
+.empty:hover {
+  background-color: #2563eb;
 }
 </style>

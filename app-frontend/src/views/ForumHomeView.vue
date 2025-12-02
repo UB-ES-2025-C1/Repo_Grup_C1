@@ -2,24 +2,28 @@
   <AppHeader />
 
   <div class="container">
-    <!-- Filtros -->
-    <section class="filters-section">
-      <ForumFilter
-        @applyFilters="applyFilters"
-      />
-    </section>
-
     <!-- Mensajes de carga o error -->
     <div v-if="loading" class="empty">Loading forums...</div>
     <div v-else-if="error" class="empty">⚠️ {{ error }}</div>
 
     <!-- Lista de foros -->
     <template v-else>
+      <!-- Filtros -->
+      <section class="filters-section">
+        <ForumFilter
+          @applyFilters="applyFilters"
+        />
+      </section>
+      
       <div class="forums-header">
         <h2>Forums</h2>
-        <button class="create-forum" @click="openCreateForumModal">
+        <button class="create-forum" @click="showCreateForum = true">
           + Create Forum
         </button>
+        <CreateForum
+          v-if="showCreateForum"
+          @close="showCreateForum = false"
+        />
       </div>
 
       <!-- Forums -->
@@ -59,6 +63,7 @@ import axios from 'axios'
 import { withApiBase } from '@/utils/api'
 import ForumCard from '@/components/ForumCard.vue'
 import ForumFilter from '@/components/ForumFilter.vue'
+import CreateForum from '@/components/CreateForum.vue'
 
 // --- ESTADO ---
 const allForums = ref([]);
@@ -68,9 +73,11 @@ const page = ref(1);
 const pageSize = ref(10);
 const searchQuery = ref('');
 const selectedFilters = ref({
+  searchQuery: '',
   sortBy: 'popularity',
   order: 'desc'
-})
+});
+const showCreateForum = ref(false);
 
 // --- CARGAR DATOS ---
 onMounted(async () => {
@@ -78,8 +85,11 @@ onMounted(async () => {
     const forumsRes = await axios.get(withApiBase('/movies/forums/'));
     allForums.value = Array.isArray(forumsRes.data) ? forumsRes.data : [];
   } catch (err) {
-    console.error('Error loading forums:', err);
-    error.value = 'Failed to load forums. Please try again later.';
+    if (err.response?.data?.detail) {
+      error.value = err.response.data.detail[0];
+    } else {
+      error.value = 'Failed to load forums. Please try again later.';
+    }
     allForums.value = [];
   } finally {
     loading.value = false;
@@ -93,8 +103,8 @@ const filteredForums = computed(() => {
   }
   let result = allForums.value;
 
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase();
+  if (selectedFilters.value.searchQuery.trim()) {
+    const q = selectedFilters.value.searchQuery.toLowerCase();
     result = result.filter(f => f?.title?.toLowerCase().includes(q));
   }
 
@@ -145,11 +155,6 @@ const nextPage = () => {
 const prevPage = () => {
   if (page.value > 1) page.value--;
 };
-
-// --- CREAR UN NUEVO FORO ---
-const openCreateForumModal = () => {
-
-};
 </script>
 
 <style scoped>
@@ -179,6 +184,18 @@ const openCreateForumModal = () => {
   color: white;
   font-weight: 600;
   cursor: pointer;
+}
+
+.create-forum:hover {
+  background-color: #2563eb;
+}
+
+/* 🔹 Forums */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
 }
 
 /* 🔹 Paginación */

@@ -4,7 +4,7 @@
     <div class="search-bar">
       <label for="search">Name</label>
       <input
-        v-model="searchQuery"
+        v-model="selected.searchQuery"
         type="text"
         placeholder="Search forums..."
         class="search-input"
@@ -17,8 +17,8 @@
       <div class="filter-group">
         <label for="sort">Sort by</label>
         <select id="sort" v-model="selected.sortBy">
-          <option value="title">Alphabetically</option>
           <option value="popularity">Popularity</option>
+          <option value="title">Alphabetically</option>
           <option value="creation">Creation</option>
         </select>
       </div>
@@ -35,40 +35,49 @@
 
     <!-- Buttons -->
     <div class="buttons">
-      <button class="apply" @click="applyFilters">Apply Filters</button>
-      <button class="clear" @click="resetFilters">Clear Filters</button>
+      <button class="apply" @click="applyFilters">Apply Sorting</button>
+      <button class="clear" @click="resetFilters">Clear Sorting</button>
     </div>
   </section>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref,watch } from 'vue'
 
 // Emite los filtros seleccionados al padre
 const emit = defineEmits(['applyFilters']);
 
 const selected = ref({
+  searchQuery: '',
   sortBy: 'popularity',
   order: 'desc'
 });
+
+watch(
+  () => selected.value.searchQuery,
+  () => {
+    applyFilters(); // Se ejecuta automáticamente al cambiar el input
+  }
+);
 
 function applyFilters() {
   emit('applyFilters', { ...selected.value });
 }
 
 function resetFilters() {
-  selected.value = {
-    sortBy: 'rating',
-    order: 'desc'
-  }
+  selected.value.sortBy = 'popularity';
+  selected.value.order = 'desc';
   emit('applyFilters', { ...selected.value });
 }
 </script>
 
 <style scoped>
 .filter-section {
-  width: max-content;
+  width: 100%;
+  max-width: 100%;
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   padding: 0.5rem;
   background-color: #111820;
   border-radius: 12px;
@@ -78,7 +87,8 @@ function resetFilters() {
 }
 
 .search-bar {
-  width: 40rem;
+  flex: 1;
+  min-width: 16rem;
   display: flex;
   flex-direction: column;
 }
@@ -104,7 +114,6 @@ function resetFilters() {
 
 .filters {
   display: flex;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
 }
 
@@ -134,14 +143,14 @@ input:focus {
 }
 
 .buttons {
+  height: 2.25rem;;
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
-  margin-top: 1.5rem;
+  margin-top: auto;
 }
 
 button {
-  padding: 0.5rem 1rem;
   border-radius: 6px;
   border: none;
   cursor: pointer;
