@@ -1,7 +1,17 @@
 <template>
   <section class="filter-section">
-    <h2>Filter</h2>
+    <!-- Barra de búsqueda -->
+    <div class="search-bar">
+      <label for="search">Name</label>
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Search forums..."
+        class="search-input"
+      />
+    </div>
 
+    <!-- Filtros -->
     <div class="filters">
       <!-- Sort -->
       <div class="filter-group">
@@ -9,6 +19,7 @@
         <select id="sort" v-model="selected.sortBy">
           <option value="title">Alphabetically</option>
           <option value="popularity">Popularity</option>
+          <option value="creation">Creation</option>
         </select>
       </div>
 
@@ -56,22 +67,43 @@ function resetFilters() {
 
 <style scoped>
 .filter-section {
-  max-width: 900px;
-  margin: 2rem auto;
-  padding: 1.5rem;
+  width: max-content;
+  display: flex;
+  padding: 0.5rem;
   background-color: #111820;
   border-radius: 12px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
   color: #eaeaea;
+  gap: 1rem;
 }
 
-h2 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+.search-bar {
+  width: 40rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-input {
+  flex: 1;
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background-color: #1f2937;
+  color: #eaeaea;
+  font-size: 1rem;
+}
+
+.search-input::placeholder {
+  color: #9ca3af;
+}
+
+.search-input:focus {
+  outline: 2px solid #3b82f6;
 }
 
 .filters {
-  display: grid;
+  display: flex;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
 }

@@ -2,17 +2,7 @@
   <AppHeader />
 
   <div class="container">
-    <!-- 🔍 Barra de búsqueda -->
-    <div class="search-bar">
-      <input
-        v-model="searchQuery"
-        type="text"
-        placeholder="Search forums..."
-        class="search-input"
-      />
-    </div>
-
-    <!-- 🎬 Filtros -->
+    <!-- Filtros -->
     <section class="filters-section">
       <ForumFilter
         @applyFilters="applyFilters"
@@ -116,9 +106,15 @@ const filteredForums = computed(() => {
     });
   } else if (selectedFilters.value.sortBy === 'popularity') {
     result = [...result].sort((a, b) => {
-      const valA = a.numUsers || 0;
-      const valB = b.numUsers || 0;
+      const valA = a.posts_count || 0;
+      const valB = b.posts_count || 0;
       return selectedFilters.value.order === 'asc' ? valA - valB : valB - valA;
+    });
+  } else if (selectedFilters.value.sortBy === 'creation') {
+    result = [...result].sort((a, b) => {
+      const valA = a.created_at || 0;
+      const valB = b.created_at || 0;
+      return selectedFilters.value.order === 'asc' ? tA.localeCompare(tB) : tB.localeCompare(tA);
     });
   }
 
@@ -149,6 +145,11 @@ const nextPage = () => {
 const prevPage = () => {
   if (page.value > 1) page.value--;
 };
+
+// --- CREAR UN NUEVO FORO ---
+const openCreateForumModal = () => {
+
+};
 </script>
 
 <style scoped>
@@ -158,30 +159,9 @@ const prevPage = () => {
   padding: 1rem;
 }
 
-/* 🔹 Barra de búsqueda */
-.search-bar {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1.5rem;
-}
-
-.search-input {
+/* 🔹 Filters */
+.filters-section {
   width: 100%;
-  max-width: 600px;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-  border: 1px solid #333;
-  background-color: #1f2937;
-  color: #eaeaea;
-  font-size: 1rem;
-}
-
-.search-input::placeholder {
-  color: #9ca3af;
-}
-
-.search-input:focus {
-  outline: 2px solid #3b82f6;
 }
 
 /* 🔹 Forum header */
