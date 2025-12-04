@@ -37,7 +37,7 @@
     <!-- Preview the user's existing rating if available -->
     <h2>Your rating</h2>
     <p v-if="!hasUserRating" style="color:var(--muted)">You haven't rated this movie yet.</p>
-    <div class="user-rating-preview" v-if="hasUserRating && ratingPreview">
+    <div class="user-rating-preview" v-if="hasUserRating && ratingPreview && ratingPreview.overall_score !== undefined && ratingPreview.overall_score !== null">
       <CommentCard :rating="ratingPreview" :profileRouteName="null" />
     </div>
     <div class="actions" style="margin-top:1rem; margin-bottom:3rem;">
@@ -139,24 +139,34 @@ onMounted(async () => {
         const ratingResp = await axios.get(withApiBase(`/movies/ratings/${props.tconst}/`), {
           headers: { Authorization: `Bearer ${token}` }
         });
-        ratingPreview.value = ratingResp.data;
-        hasUserRating.value = true;
+        
+        // Check if it's actually a rating (has overall_score) or just a comment
+        if (ratingResp.data && ratingResp.data.overall_score) {
+          console.log('Setting ratingPreview with overall_score:', ratingResp.data.overall_score);
+          ratingPreview.value = ratingResp.data;
+          hasUserRating.value = true;
 
-        // Get user's comment for this movie
-        try {
-          const commentResp = await axios.get(withApiBase(`/movies/comments/${props.tconst}/`), {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          userComment = commentResp.data;
-          // Add comment text to rating preview
-          if (userComment && userComment.text) {
-            ratingPreview.value.comment = userComment.text;
+          // Get user's comment for this movie
+          try {
+            const commentResp = await axios.get(withApiBase(`/movies/comments/${props.tconst}/`), {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            userComment = commentResp.data;
+            // Add comment text and comment_id to rating preview
+            if (userComment && userComment.text) {
+              ratingPreview.value.comment = userComment.text;
+              ratingPreview.value.comment_id = userComment.id;
+            }
+          } catch (commentErr) {
+            // User doesn't have a comment yet, that's fine
+            if (commentErr.response?.status !== 404) {
+              console.warn('Error fetching user comment:', commentErr);
+            }
           }
-        } catch (commentErr) {
-          // User doesn't have a comment yet, that's fine
-          if (commentErr.response?.status !== 404) {
-            console.warn('Error fetching user comment:', commentErr);
-          }
+        } else {
+          // No rating with scores, treat as not rated
+          console.log('No rating with overall_score. ratingResp.data:', ratingResp.data);
+          hasUserRating.value = false;
         }
       } else {
         hasUserRating.value = false;
@@ -190,26 +200,53 @@ onMounted(async () => {
       // Combine comments with their associated ratings
       let combinedData = allComments
         .map(comment => {
-          const rating = ratingsByUsername[comment.username];
-          if (!rating) return null; // Skip comments without rating
+          // Only include root comments (no parent)
+          if (comment.parent_id !== null) return null;
           
-          // Merge comment text into rating object
+          const rating = ratingsByUsername[comment.username];
+          
+          // If there's a rating, merge comment into it
+          if (rating) {
+            return {
+              ...rating,
+              comment: comment.text,
+              comment_id: comment.id,
+              like_count: comment.like_count,
+              reply_count: comment.reply_count,
+              is_liked: comment.is_liked,
+              parent_id: comment.parent_id,
+              username: comment.username,
+              user_photo: comment.user_photo
+            };
+          }
+          
+          // If no rating, still include the comment
           return {
-            ...rating,
-            comment: comment.text, // Use comment text from Comment model
-            comment_id: comment.id, // Preserve comment ID for likes/replies
+            id: comment.id,
+            comment_id: comment.id,
+            username: comment.username,
+            user: comment.user,
+            user_photo: comment.user_photo,
+            text: comment.text,
+            comment: comment.text,
             like_count: comment.like_count,
             reply_count: comment.reply_count,
-            is_liked: comment.is_liked
+            is_liked: comment.is_liked,
+            created_at: comment.created_at,
+            updated_at: comment.updated_at,
+            parent_id: comment.parent_id
           };
         })
-        .filter(item => item !== null); // Remove nulls (comments without ratings)
+        .filter(item => item !== null);
 
-      // Exclude the authenticated user's rating (we show it separately)
+      // Exclude the authenticated user's RATING (we show it separately in "Your rating" section)
       if (hasUserRating.value && ratingPreview.value?.user?.username) {
-        combinedData = combinedData.filter(r => 
-          r.user?.username !== ratingPreview.value.user.username
-        );
+        const userUsername = ratingPreview.value.user.username;
+        combinedData = combinedData.filter(r => {
+          // Check both user.username and username fields
+          const rUsername = r.user?.username || r.username;
+          return rUsername !== userUsername;
+        });
       }
 
       // Sort newest-first by date

@@ -7,7 +7,8 @@ from .views import (
     UserRegisterAPIView, UserLoginAPIView, MovieListAPIView, 
     MovieDetailAPIView, RatingCreateAPIView, UserMovieRatingAPIView,
     UserProfileDetailAPIView, MyProfileAPIView, UserRatingsListAPIView, MovieRatingsListAPIView,get_all_users,
-    MovieCommentsListAPIView,  UserMovieCommentAPIView, CommentRepliesListAPIView, CommentLikeToggleAPIView, ForumListCreateAPIView, ForumDetailAPIView, ForumPostListCreateAPIView
+    MovieCommentsListAPIView,  UserMovieCommentAPIView, CommentRepliesListAPIView, CommentLikeToggleAPIView, 
+    CommentUpdateAPIView, ForumListCreateAPIView, ForumDetailAPIView, ForumPostListCreateAPIView
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -33,6 +34,7 @@ urlpatterns = [
     
     path('comments/<int:comment_id>/replies/', CommentRepliesListAPIView.as_view(), name='comment-replies-list'),
     path('comments/<int:comment_id>/like/', CommentLikeToggleAPIView.as_view(), name='comment-like-toggle'),
+    path('comments/<int:comment_id>/', CommentUpdateAPIView.as_view(), name='comment-update'),
     path('comments/<str:tconst>/', UserMovieCommentAPIView.as_view(), name='user-movie-comment'),
     
     # Rutas dinámicas 'catch-all' (que capturan cualquier string) AL FINAL

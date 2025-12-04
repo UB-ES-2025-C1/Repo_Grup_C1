@@ -345,6 +345,34 @@ class CommentLikeToggleAPIView(APIView):
             'liked': liked, 
             'like_count': comment.likes.count()
         }, status=status.HTTP_200_OK)
+
+class CommentUpdateAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Permite actualizar o eliminar un comentario específico por su ID.
+    Solo el autor del comentario puede editarlo o eliminarlo.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'pk'
+    lookup_url_kwarg = 'comment_id'
+
+    def get_queryset(self):
+        return Comment.objects.select_related('user').annotate(
+            reply_count=Count('replies'),
+            like_count=Count('likes')
+        )
+
+    def get_object(self):
+        comment = super().get_object()
+        # Verificar que el usuario es el autor del comentario
+        # Compare by ID to avoid issues with object comparison
+        if comment.user.id != self.request.user.id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("No tienes permiso para editar este comentario.")
+        return comment
+    
+    def perform_update(self, serializer):
+        serializer.save()
     
 class ForumListCreateAPIView(generics.ListCreateAPIView):
     """

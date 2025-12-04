@@ -261,7 +261,7 @@ class CommentSerializer(serializers.ModelSerializer):
     )
     movie_tconst = serializers.CharField(write_only=True, required=False)
     # Allow blank text for comments that are being cleared
-    text = serializers.CharField(allow_blank=True, required=False)
+    text = serializers.CharField(allow_blank=True, required=False, max_length=1000)
 
     class Meta:
         model = Comment
