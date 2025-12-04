@@ -8,9 +8,14 @@ from .serializers import UserRegisterSerializer, UserLoginSerializer, MovieSeria
 from django.db.models import Avg
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import permissions, generics
-from .models import Profile
-from .serializers import UserProfileSerializer, ProfileUpdateSerializer
+from .models import Profile, Comment
+from .serializers import UserProfileSerializer, ProfileUpdateSerializer, CommentSerializer
 from rest_framework.decorators import api_view
+from rest_framework import status
+from django.db.models import Count
+from .models import CommentLike
+from .models import Forum, ForumPost
+from .serializers import ForumSerializer, ForumPostSerializer
 
 
 
@@ -214,3 +219,208 @@ def get_all_users(request):
     
     serializer = UserProfileSerializer(profiles, many=True)
     return Response(serializer.data)
+
+class MovieCommentsListAPIView(generics.ListAPIView):
+    """
+    Lista los comentarios RAÍZ.
+    ORDEN: Primero los que tienen más likes, luego los más recientes.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        tconst = self.kwargs.get('tconst')
+        return Comment.objects.filter(
+            movie__tconst=tconst, 
+            parent__isnull=True
+        ).select_related('user', 'user__profile').prefetch_related('likes').annotate(
+            reply_count=Count('replies', distinct=True),
+            like_count=Count('likes', distinct=True) # Contamos likes
+        ).order_by('-like_count', 'created_at') # <--- ORDEN ASCENDENTE POR LIKES
+
+
+class CommentRepliesListAPIView(generics.ListAPIView):
+    """
+    Lista las respuestas.
+    ORDEN: Cronológico (Ascendente), los likes no afectan al orden aquí.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        comment_id = self.kwargs.get('comment_id')
+        return Comment.objects.filter(
+            parent__id=comment_id
+        ).select_related('user', 'user__profile').prefetch_related('likes').annotate(
+            reply_count=Count('replies', distinct=True),
+            like_count=Count('likes', distinct=True)
+        ).order_by('created_at') # <--- ORDEN CRONOLÓGICO ASCENDENTE
+
+"""
+class CommentLikeToggleAPIView(APIView):
+    "Permite dar o quitar like a un comentario."
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, comment_id):
+        comment = get_object_or_404(Comment, pk=comment_id)
+        user = request.user
+
+        if user in comment.likes.all():
+            comment.likes.remove(user)
+            liked = False
+        else:
+            comment.likes.add(user)
+            liked = True
+            
+        return Response({
+            'liked': liked, 
+            'like_count': comment.likes.count()
+        }, status=status.HTTP_200_OK)
+"""
+
+class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.CreateAPIView):
+    """
+    Gestiona comentarios.
+    - Si se llama con GET/PATCH/DELETE a .../comments/ttXXXX/: Gestiona TU comentario RAÍZ de esa peli.
+    - Si se llama con POST: Permite crear comentarios raíz O respuestas.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Comment.objects.select_related('user').annotate(
+            reply_count=Count('replies'),
+            like_count=Count('likes')
+        )
+
+    def get_object(self):
+        # Obtiene TU comentario principal sobre la película (no respuestas)
+        tconst = self.kwargs.get('tconst')
+        user = self.request.user
+        movie = get_object_or_404(Movie, tconst=tconst)
+        
+        # Buscamos solo el comentario raíz (parent=None) usando the queryset with annotations
+        queryset = self.get_queryset()
+        obj = get_object_or_404(queryset, movie=movie, user=user, parent__isnull=True)
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+    def create(self, request, *args, **kwargs):
+        tconst = self.kwargs.get('tconst')
+        movie = get_object_or_404(Movie, tconst=tconst)
+        
+        # Verificamos si envían parent_id (es una respuesta)
+        parent_id = request.data.get('parent_id')
+
+        if not parent_id:
+            # Es un comentario raíz. Verificamos si ya existe uno (UniqueConstraint lo pararía, pero mejor avisar antes).
+            if Comment.objects.filter(movie=movie, user=request.user, parent__isnull=True).exists():
+                return Response(
+                    {"detail": "Ya has comentado esta película. Usa PATCH para editar tu reseña principal."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        data = request.data.copy()
+        data['movie_tconst'] = tconst
+        
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+class CommentLikeToggleAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, comment_id):
+        comment = get_object_or_404(Comment, pk=comment_id)
+        user = request.user
+
+        # Buscamos si ya existe el like
+        existing_like = CommentLike.objects.filter(comment=comment, user=user).first()
+
+        if existing_like:
+            # Si existe, lo borramos (Quitar Like)
+            existing_like.delete()
+            liked = False
+        else:
+            # Si no existe, lo creamos (Dar Like)
+            CommentLike.objects.create(comment=comment, user=user)
+            liked = True
+            
+        # Contamos usando el related_name 'likes'
+        return Response({
+            'liked': liked, 
+            'like_count': comment.likes.count()
+        }, status=status.HTTP_200_OK)
+
+class CommentUpdateAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Permite actualizar o eliminar un comentario específico por su ID.
+    Solo el autor del comentario puede editarlo o eliminarlo.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'pk'
+    lookup_url_kwarg = 'comment_id'
+
+    def get_queryset(self):
+        return Comment.objects.select_related('user').annotate(
+            reply_count=Count('replies'),
+            like_count=Count('likes')
+        )
+
+    def get_object(self):
+        comment = super().get_object()
+        # Verificar que el usuario es el autor del comentario
+        # Compare by ID to avoid issues with object comparison
+        if comment.user.id != self.request.user.id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("No tienes permiso para editar este comentario.")
+        return comment
+    
+    def perform_update(self, serializer):
+        serializer.save()
+    
+class ForumListCreateAPIView(generics.ListCreateAPIView):
+    """
+    GET: Lista todos los foros (Público).
+    POST: Crea un nuevo foro (Solo Logueados).
+    """
+    queryset = Forum.objects.all()
+    serializer_class = ForumSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user)
+
+
+class ForumDetailAPIView(generics.RetrieveAPIView):
+    """
+    GET: Ver detalles de un foro específico.
+    """
+    queryset = Forum.objects.all()
+    serializer_class = ForumSerializer
+    permission_classes = [permissions.AllowAny]
+
+class ForumPostListCreateAPIView(generics.ListCreateAPIView):
+    """
+    GET: Lista los posts de un foro (Ordenados por antigüedad).
+    POST: Crea un post en el foro (Solo Logueados).
+    """
+    serializer_class = ForumPostSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        forum_id = self.kwargs.get('forum_id')
+        # El orden ya viene definido en el modelo Meta (['created_at'])
+        return ForumPost.objects.filter(forum__id=forum_id).select_related('user', 'user__profile')
+
+    def perform_create(self, serializer):
+        forum_id = self.kwargs.get('forum_id')
+        forum = get_object_or_404(Forum, pk=forum_id)
+        
+        # Guardamos el post y actualizamos la fecha del foro para que suba en la lista
+        serializer.save(user=self.request.user, forum=forum)
+        
+        # Opcional: Actualizar el 'updated_at' del foro para indicar actividad reciente
+        forum.save()

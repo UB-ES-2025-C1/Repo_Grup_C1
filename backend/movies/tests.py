@@ -2,6 +2,7 @@
 Simple tests for the movies app.
 - TestMovieModel: unit tests for Movie.average_rating
 - TestRatingAPI: small API tests for creating/updating a Rating via the /movies/ratings/ endpoint
+- TestCommentAPI: tests for hierarchical comments (root vs replies)
 
 Run with:
 	python manage.py test movies
@@ -19,7 +20,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 
-from .models import Movie, Rating, Profile
+from .models import Movie, Rating, Profile, Comment, CommentLike, Forum, ForumPost
 
 
 class TestMovieGetAPI(APITestCase):
@@ -211,8 +212,7 @@ class TestRatingAPI(APITestCase):
 			"soundtrack": 7,
 			"acting": 9,
 			"cinematography": 8,
-			"plot": 8,
-			"comment": "Great!"
+			"plot": 8
 		}
 
 		# Without authentication -> expect 401 or 403 depending on config
@@ -229,8 +229,7 @@ class TestRatingAPI(APITestCase):
 			"soundtrack": 7,
 			"acting": 9,
 			"cinematography": 8,
-			"plot": 8,
-			"comment": "Great!"
+			"plot": 8
 		}
 
 		resp = self.client.post(self.ratings_url, payload, format='json')
@@ -263,8 +262,7 @@ class TestRatingAPI(APITestCase):
 			soundtrack=6,
 			acting=8,
 			cinematography=7,
-			plot=7,
-			comment="Good"
+			plot=7
 		)
 
 		self.client.force_authenticate(user=self.user)
@@ -337,7 +335,7 @@ class TestProfileAPI(APITestCase):
         
         # We also test with the PATCH method.
         response_patch = self.client.patch(url, {'bio': 'attempt'}, format='json')
-        self.assertEqual(response_patch.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_authenticated_user_can_view_own_profile(self):
         """Tests that a logged-in user can make a GET request to /profiles/me/."""
@@ -562,4 +560,310 @@ class TestUserSearchAPI(APITestCase):
             self.assertIn('bio', item)
             self.assertIn('photo', item)
             self.assertIn('average_rating', item)
-            
+
+class TestCommentAPI(APITestCase):
+    """
+    Tests for Hierarchical Comments (Threaded Comments)
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.user1 = User.objects.create_user(username="u1", email="u1@test.com", password="pw")
+        self.user2 = User.objects.create_user(username="u2", email="u2@test.com", password="pw")
+        self.movie = Movie.objects.create(tconst="tt999999", primary_title="Comment Test Movie")
+        
+        self.manage_url = f'/movies/comments/{self.movie.tconst}/'
+        self.list_url = f'/movies/{self.movie.tconst}/comments/'
+
+    def test_create_root_comment(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {"text": "Root comment by u1"}
+        resp = self.client.post(self.manage_url, payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Comment.objects.count(), 1)
+        c = Comment.objects.first()
+        self.assertIsNone(c.parent)
+        self.assertEqual(c.text, "Root comment by u1")
+
+    def test_duplicate_root_comment_fails(self):
+        self.client.force_authenticate(user=self.user1)
+        # First creation
+        self.client.post(self.manage_url, {"text": "First"}, format='json')
+        # Second creation attempt
+        resp = self.client.post(self.manage_url, {"text": "Second"}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        # Should still be 1 comment
+        self.assertEqual(Comment.objects.count(), 1)
+
+    def test_create_reply_allowed_even_if_root_exists(self):
+        """
+        User can create a reply even if they already have a root comment on the same movie.
+        """
+        self.client.force_authenticate(user=self.user1)
+        # 1. Create root comment by User 1
+        r1 = self.client.post(self.manage_url, {"text": "Root"}, format='json')
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        root_id = r1.data['id']
+
+        # 2. Create reply by User 1 pointing to their own root
+        payload = {"text": "Reply to myself", "parent_id": root_id}
+        resp = self.client.post(self.manage_url, payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        
+        self.assertEqual(Comment.objects.count(), 2)
+        
+        reply = Comment.objects.last()
+        
+        self.assertEqual(reply.text, "Reply to myself")
+        self.assertIsNotNone(reply.parent)
+        self.assertEqual(reply.parent.id, root_id)
+
+    def test_get_root_comments_has_reply_count(self):
+        """
+        Verifica que al pedir comentarios de la peli, vienen sin anidar
+        pero con el contador 'reply_count'.
+        """
+        c1 = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
+        
+        Comment.objects.create(user=self.user2, movie=self.movie, text="Reply 1", parent=c1)
+        Comment.objects.create(user=self.user2, movie=self.movie, text="Reply 2", parent=c1)
+
+        resp = self.client.get(self.list_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        root_data = resp.data[0]
+        self.assertEqual(root_data['id'], c1.id)
+        
+        self.assertNotIn('replies', root_data)
+        
+        self.assertIn('reply_count', root_data)
+        self.assertEqual(root_data['reply_count'], 2)
+
+    def test_get_specific_replies_endpoint(self):
+        """
+        Verifica que podemos pedir las respuestas de un comentario específico en su propio endpoint.
+        """
+        c1 = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
+        c2 = Comment.objects.create(user=self.user2, movie=self.movie, text="Reply A", parent=c1)
+        
+        # URL to see replies: /api/movies/comments/<id>/replies/
+        replies_url = f'/movies/comments/{c1.id}/replies/'
+        
+        resp = self.client.get(replies_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]['text'], "Reply A")
+        self.assertEqual(resp.data[0]['parent_id'], c1.id)
+
+    def test_update_root_comment(self):
+        Comment.objects.create(user=self.user1, movie=self.movie, text="Original")
+        self.client.force_authenticate(user=self.user1)
+        
+        payload = {"text": "Updated"}
+        resp = self.client.patch(self.manage_url, payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        self.user1.refresh_from_db()
+        # Fetch comment again
+        c = Comment.objects.get(user=self.user1, movie=self.movie)
+        self.assertEqual(c.text, "Updated")
+
+    def test_delete_root_comment(self):
+        c = Comment.objects.create(user=self.user1, movie=self.movie, text="To delete")
+        # Add a reply to verify cascade delete (optional check)
+        Comment.objects.create(user=self.user2, movie=self.movie, text="Reply", parent=c)
+        
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.delete(self.manage_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+        
+        self.assertEqual(Comment.objects.count(), 0)
+    
+    def test_toggle_like(self):
+
+        c = Comment.objects.create(user=self.user1, movie=self.movie, text="Like me")
+        like_url = f'/movies/comments/{c.id}/like/'
+        
+        self.client.force_authenticate(user=self.user2)
+        
+        # 1. Add Like
+        resp = self.client.post(like_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data['liked'])
+        self.assertEqual(resp.data['like_count'], 1)
+        
+        # Verificamos que existe el objeto CommentLike
+        self.assertTrue(CommentLike.objects.filter(comment=c, user=self.user2).exists())
+        
+        # 2. Remove Like
+        resp = self.client.post(like_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(resp.data['liked'])
+        self.assertEqual(resp.data['like_count'], 0)
+        
+        self.assertFalse(CommentLike.objects.filter(comment=c, user=self.user2).exists())
+
+    def test_root_comments_ordering_by_likes(self):
+        """
+        Root comments should be ordered by most likes first.
+        """
+        # Create 3 comments
+        c1 = Comment.objects.create(user=self.user1, movie=self.movie, text="C1 No Likes")
+        c2 = Comment.objects.create(user=self.user2, movie=self.movie, text="C2 Many Likes")
+        
+        # We need a 3rd user to differentiate counts
+        u3 = User.objects.create_user(username="u3", email="u3@t.com", password="p")
+        
+        # C2 gets 2 likes
+        CommentLike.objects.create(comment=c2, user=self.user1)
+        CommentLike.objects.create(comment=c2, user=u3)
+        
+        # C1 gets 0 likes
+        
+        # Fetch list
+        resp = self.client.get(self.list_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        # Order should be C2 (2 likes) then C1 (0 likes)
+        self.assertEqual(resp.data[0]['id'], c2.id)
+        self.assertEqual(resp.data[1]['id'], c1.id)
+
+    def test_replies_ordering_is_still_chronological(self):
+        """
+        Replies should ignore likes for ordering and stick to creation date (ascending).
+        """
+        root = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
+        
+        # Create Reply 1 (Oldest)
+        r1 = Comment.objects.create(user=self.user1, movie=self.movie, text="Reply 1", parent=root)
+        
+        # r1 gets 2 likes (should not move up because replies are chronological)
+        CommentLike.objects.create(comment=r1, user=self.user1)
+        CommentLike.objects.create(comment=r1, user=self.user2)
+        
+        # Create Reply 2 (Newest) - 0 Likes
+        r2 = Comment.objects.create(user=self.user2, movie=self.movie, text="Reply 2", parent=root)
+        
+        replies_url = f'/movies/comments/{root.id}/replies/'
+        resp = self.client.get(replies_url, format='json')
+        
+        # Order should be R1 then R2 (Chronological), despite R1 having more likes
+        self.assertEqual(resp.data[0]['id'], r1.id)
+        self.assertEqual(resp.data[1]['id'], r2.id)
+    
+    def test_reply_to_reply_is_forbidden(self):
+        """
+        Verifica que no se puede crear una respuesta a un comentario que ya es una respuesta.
+        """
+        self.client.force_authenticate(user=self.user1)
+        
+        # 1. Crear comentario raíz
+        root = Comment.objects.create(user=self.user1, movie=self.movie, text="Root")
+        
+        # 2. Crear respuesta nivel 1 (OK)
+        reply_lvl_1 = Comment.objects.create(user=self.user2, movie=self.movie, text="Reply Lvl 1", parent=root)
+        
+        # 3. Intentar crear respuesta nivel 2 (Debería fallar)
+        payload = {"text": "Reply Lvl 2", "parent_id": reply_lvl_1.id}
+        resp = self.client.post(self.manage_url, payload, format='json')
+        
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        # Verificamos que el mensaje de error es el esperado (opcional)
+        self.assertIn("No se permiten respuestas anidadas", str(resp.data))
+
+class TestForumAPI(APITestCase):
+    """
+    TESTS FORUMS AND POSTS
+    Requisitos:
+    - Solo usuarios logueados pueden crear foros o comentar.
+    - Los comentarios deben ir ordenados de MÁS ANTIGUO a MÁS RECIENTE.
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.user1 = User.objects.create_user(username="forumUser1", email="f1@test.com", password="pw")
+        self.user2 = User.objects.create_user(username="forumUser2", email="f2@test.com", password="pw")
+        
+        # URLs base (asumiendo que tus urls están bajo /movies/)
+        self.forums_url = '/movies/forums/'
+
+    def test_get_forums_list_public(self):
+        """Cualquiera puede ver la lista de foros."""
+        Forum.objects.create(title="Public Forum", creator=self.user1)
+        resp = self.client.get(self.forums_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data), 1)
+
+    def test_create_forum_unauthenticated_fails(self):
+        """Si no estás logueado, no puedes crear un foro."""
+        payload = {"title": "Hacker Forum", "description": "Trying to hack"}
+        resp = self.client.post(self.forums_url, payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_forum_authenticated_success(self):
+        """Usuario logueado crea foro y se asigna como creador."""
+        self.client.force_authenticate(user=self.user1)
+        payload = {"title": "Official Discussion", "description": "Let's talk"}
+        
+        resp = self.client.post(self.forums_url, payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        
+        # Verificar en BD
+        self.assertEqual(Forum.objects.count(), 1)
+        forum = Forum.objects.first()
+        self.assertEqual(forum.creator, self.user1)
+
+    def test_create_post_unauthenticated_fails(self):
+        """No logueado no puede publicar en un foro."""
+        forum = Forum.objects.create(title="F1", creator=self.user1)
+        url = f'/movies/forums/{forum.id}/posts/'
+        
+        resp = self.client.post(url, {'text': 'Anon post'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_post_authenticated_success(self):
+        """Usuario logueado puede publicar."""
+        forum = Forum.objects.create(title="F1", creator=self.user1)
+        url = f'/movies/forums/{forum.id}/posts/'
+        
+        self.client.force_authenticate(user=self.user2)
+        resp = self.client.post(url, {'text': 'Hello world'}, format='json')
+        
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(ForumPost.objects.count(), 1)
+        post = ForumPost.objects.first()
+        self.assertEqual(post.user, self.user2)
+        self.assertEqual(post.forum, forum)
+
+    def test_forum_posts_ordering_chronological(self):
+        """
+        Verifica CRUCIALMENTE que el orden es Cronológico (Antiguo -> Nuevo).
+        El primer elemento de la lista debe ser el más viejo.
+        """
+        forum = Forum.objects.create(title="Ordering Test", creator=self.user1)
+        
+        # Creamos posts en orden
+        # Post 1 (Más antiguo)
+        p1 = ForumPost.objects.create(forum=forum, user=self.user1, text="First Post (Oldest)")
+        
+        # Post 2
+        p2 = ForumPost.objects.create(forum=forum, user=self.user2, text="Second Post")
+        
+        # Post 3 (Más reciente)
+        p3 = ForumPost.objects.create(forum=forum, user=self.user1, text="Third Post (Newest)")
+
+        url = f'/movies/forums/{forum.id}/posts/'
+        resp = self.client.get(url, format='json')
+        
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.data
+        
+        self.assertEqual(len(data), 3)
+        
+        # VERIFICACIÓN DE ORDEN:
+        # data[0] debe ser p1 (el más viejo)
+        self.assertEqual(data[0]['id'], p1.id)
+        self.assertEqual(data[0]['text'], "First Post (Oldest)")
+        
+        # data[2] debe ser p3 (el más nuevo)
+        self.assertEqual(data[2]['id'], p3.id)
+        self.assertEqual(data[2]['text'], "Third Post (Newest)")
