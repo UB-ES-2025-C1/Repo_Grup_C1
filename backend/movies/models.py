@@ -170,7 +170,7 @@ class Profile(models.Model):
 class Comment(models.Model):
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='comments')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    text = models.TextField()
+    text = models.TextField(blank=True, default='')
     
     # Si es null, es un comentario raíz (opinión de la peli).
     # Si tiene valor, es una respuesta a otro comentario.
@@ -212,3 +212,30 @@ class CommentLike(models.Model):
 
     def __str__(self):
         return f'{self.user.username} likes comment {self.comment.id}'
+
+class Forum(models.Model):
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_forums')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at'] # Los foros con actividad reciente primero
+
+    def __str__(self):
+        return self.title
+
+class ForumPost(models.Model):
+    forum = models.ForeignKey(Forum, on_delete=models.CASCADE, related_name='posts')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='forum_posts')
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        # REQUISITO: Ordenados de más antiguo a más reciente
+        ordering = ['created_at'] 
+
+    def __str__(self):
+        return f'Post by {self.user.username} in {self.forum.title}'

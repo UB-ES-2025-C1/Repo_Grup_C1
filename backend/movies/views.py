@@ -14,6 +14,8 @@ from rest_framework.decorators import api_view
 from rest_framework import status
 from django.db.models import Count
 from .models import CommentLike
+from .models import Forum, ForumPost
+from .serializers import ForumSerializer, ForumPostSerializer
 
 
 
@@ -254,11 +256,9 @@ class CommentRepliesListAPIView(generics.ListAPIView):
             like_count=Count('likes', distinct=True)
         ).order_by('created_at') # <--- ORDEN CRONOLÓGICO ASCENDENTE
 
-
+"""
 class CommentLikeToggleAPIView(APIView):
-    """
-    Permite dar o quitar like a un comentario.
-    """
+    "Permite dar o quitar like a un comentario."
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, comment_id):
@@ -276,7 +276,7 @@ class CommentLikeToggleAPIView(APIView):
             'liked': liked, 
             'like_count': comment.likes.count()
         }, status=status.HTTP_200_OK)
-
+"""
 
 class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.CreateAPIView):
     """
@@ -287,14 +287,21 @@ class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.Cr
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        return Comment.objects.select_related('user').annotate(
+            reply_count=Count('replies'),
+            like_count=Count('likes')
+        )
+
     def get_object(self):
         # Obtiene TU comentario principal sobre la película (no respuestas)
         tconst = self.kwargs.get('tconst')
         user = self.request.user
         movie = get_object_or_404(Movie, tconst=tconst)
         
-        # Buscamos solo el comentario raíz (parent=None)
-        obj = get_object_or_404(Comment, movie=movie, user=user, parent__isnull=True)
+        # Buscamos solo el comentario raíz (parent=None) usando the queryset with annotations
+        queryset = self.get_queryset()
+        obj = get_object_or_404(queryset, movie=movie, user=user, parent__isnull=True)
         self.check_object_permissions(self.request, obj)
         return obj
 
@@ -345,3 +352,75 @@ class CommentLikeToggleAPIView(APIView):
             'liked': liked, 
             'like_count': comment.likes.count()
         }, status=status.HTTP_200_OK)
+
+class CommentUpdateAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Permite actualizar o eliminar un comentario específico por su ID.
+    Solo el autor del comentario puede editarlo o eliminarlo.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'pk'
+    lookup_url_kwarg = 'comment_id'
+
+    def get_queryset(self):
+        return Comment.objects.select_related('user').annotate(
+            reply_count=Count('replies'),
+            like_count=Count('likes')
+        )
+
+    def get_object(self):
+        comment = super().get_object()
+        # Verificar que el usuario es el autor del comentario
+        # Compare by ID to avoid issues with object comparison
+        if comment.user.id != self.request.user.id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("No tienes permiso para editar este comentario.")
+        return comment
+    
+    def perform_update(self, serializer):
+        serializer.save()
+    
+class ForumListCreateAPIView(generics.ListCreateAPIView):
+    """
+    GET: Lista todos los foros (Público).
+    POST: Crea un nuevo foro (Solo Logueados).
+    """
+    queryset = Forum.objects.all()
+    serializer_class = ForumSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user)
+
+
+class ForumDetailAPIView(generics.RetrieveAPIView):
+    """
+    GET: Ver detalles de un foro específico.
+    """
+    queryset = Forum.objects.all()
+    serializer_class = ForumSerializer
+    permission_classes = [permissions.AllowAny]
+
+class ForumPostListCreateAPIView(generics.ListCreateAPIView):
+    """
+    GET: Lista los posts de un foro (Ordenados por antigüedad).
+    POST: Crea un post en el foro (Solo Logueados).
+    """
+    serializer_class = ForumPostSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        forum_id = self.kwargs.get('forum_id')
+        # El orden ya viene definido en el modelo Meta (['created_at'])
+        return ForumPost.objects.filter(forum__id=forum_id).select_related('user', 'user__profile')
+
+    def perform_create(self, serializer):
+        forum_id = self.kwargs.get('forum_id')
+        forum = get_object_or_404(Forum, pk=forum_id)
+        
+        # Guardamos el post y actualizamos la fecha del foro para que suba en la lista
+        serializer.save(user=self.request.user, forum=forum)
+        
+        # Opcional: Actualizar el 'updated_at' del foro para indicar actividad reciente
+        forum.save()
