@@ -145,24 +145,7 @@ onMounted(async () => {
           console.log('Setting ratingPreview with overall_score:', ratingResp.data.overall_score);
           ratingPreview.value = ratingResp.data;
           hasUserRating.value = true;
-
-          // Get user's comment for this movie
-          try {
-            const commentResp = await axios.get(withApiBase(`/movies/comments/${props.tconst}/`), {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            userComment = commentResp.data;
-            // Add comment text and comment_id to rating preview
-            if (userComment && userComment.text) {
-              ratingPreview.value.comment = userComment.text;
-              ratingPreview.value.comment_id = userComment.id;
-            }
-          } catch (commentErr) {
-            // User doesn't have a comment yet, that's fine
-            if (commentErr.response?.status !== 404) {
-              console.warn('Error fetching user comment:', commentErr);
-            }
-          }
+          // Note: We'll merge comment data later when we fetch all comments
         } else {
           // No rating with scores, treat as not rated
           console.log('No rating with overall_score. ratingResp.data:', ratingResp.data);
@@ -188,6 +171,21 @@ onMounted(async () => {
       // Get all ratings
       const ratingsResp = await axios.get(withApiBase(`/movies/${props.tconst}/ratings/`));
       const allRatings = ratingsResp.data || [];
+
+      // If we have a rating, find the user's comment and merge its data
+      if (hasUserRating.value && ratingPreview.value?.user?.username) {
+        const userUsername = ratingPreview.value.user.username;
+        const userComment = allComments.find(c => c.username === userUsername && c.parent_id === null);
+        
+        if (userComment) {
+          // Merge comment data (with accurate like_count from the same query)
+          ratingPreview.value.comment = userComment.text;
+          ratingPreview.value.comment_id = userComment.id;
+          ratingPreview.value.like_count = userComment.like_count;
+          ratingPreview.value.is_liked = userComment.is_liked;
+          ratingPreview.value.reply_count = userComment.reply_count;
+        }
+      }
 
       // Create a map of ratings by username for quick lookup
       const ratingsByUsername = {};
@@ -249,8 +247,12 @@ onMounted(async () => {
         });
       }
 
-      // Sort newest-first by date
+      // Sort by likes (descending), then by date (newest first) if likes are equal
       combinedData.sort((a, b) => {
+        const likesA = a?.like_count || 0;
+        const likesB = b?.like_count || 0;
+        if (likesA !== likesB) return likesB - likesA;
+        
         const da = a?.date ? new Date(a.date).getTime() : 0;
         const db = b?.date ? new Date(b.date).getTime() : 0;
         if (da === db) return (b.id || 0) - (a.id || 0);

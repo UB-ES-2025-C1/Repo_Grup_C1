@@ -287,14 +287,21 @@ class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.Cr
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        return Comment.objects.select_related('user').annotate(
+            reply_count=Count('replies'),
+            like_count=Count('likes')
+        )
+
     def get_object(self):
         # Obtiene TU comentario principal sobre la película (no respuestas)
         tconst = self.kwargs.get('tconst')
         user = self.request.user
         movie = get_object_or_404(Movie, tconst=tconst)
         
-        # Buscamos solo el comentario raíz (parent=None)
-        obj = get_object_or_404(Comment, movie=movie, user=user, parent__isnull=True)
+        # Buscamos solo el comentario raíz (parent=None) usando the queryset with annotations
+        queryset = self.get_queryset()
+        obj = get_object_or_404(queryset, movie=movie, user=user, parent__isnull=True)
         self.check_object_permissions(self.request, obj)
         return obj
 

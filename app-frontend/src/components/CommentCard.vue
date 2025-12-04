@@ -59,11 +59,11 @@
       </button>
       
       <!-- Like button -->
-      <button class="like-button" :class="{ 'liked': isLiked }" @click="toggleLike">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="like-icon">
+      <button class="like-button" :class="{ 'liked': displayIsLiked }" @click="toggleLike">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" :fill="displayIsLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="like-icon">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
         </svg>
-        {{ localLikeCount }}
+        {{ displayLikeCount }}
       </button>
       
       <!-- Link to view replies - only show for root comments -->
@@ -105,9 +105,25 @@ const commentText = computed(() => {
   return text.length > 1000 ? text.slice(0, 1000) + '...' : text;
 });
 
-// Local state for like count and liked status
+// Local state for like count and liked status - only track after user interacts
+const hasUserInteracted = ref(false);
 const localLikeCount = ref(props.rating.like_count || 0);
 const isLiked = ref(props.rating.is_liked || false);
+
+// Computed properties that show correct data
+const displayLikeCount = computed(() => {
+  if (hasUserInteracted.value) {
+    return localLikeCount.value;
+  }
+  return props.rating.like_count || 0;
+});
+
+const displayIsLiked = computed(() => {
+  if (hasUserInteracted.value) {
+    return isLiked.value;
+  }
+  return props.rating.is_liked || false;
+});
 
 // Edit mode state
 const isEditing = ref(false);
@@ -213,6 +229,11 @@ async function toggleLike() {
     // Update local state with response
     isLiked.value = response.data.liked;
     localLikeCount.value = response.data.like_count;
+    hasUserInteracted.value = true;
+    
+    // Also update parent object to keep it in sync
+    props.rating.is_liked = response.data.liked;
+    props.rating.like_count = response.data.like_count;
   } catch (error) {
     console.error('Error toggling like:', error);
     // Optionally show an error message to the user
