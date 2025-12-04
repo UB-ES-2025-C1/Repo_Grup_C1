@@ -25,17 +25,17 @@
     <p v-if="rating.comment" class="comment">"{{ rating.comment.length > 1000 ? rating.comment.slice(0, 1000) + '...' : rating.comment }}"</p>
 
     <!-- Action buttons -->
-    <div v-if="rating.id" class="action-buttons">
+    <div v-if="rating.comment_id" class="action-buttons">
       <!-- Like button -->
-      <button class="like-button">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="like-icon">
+      <button class="like-button" :class="{ 'liked': isLiked }" @click="toggleLike">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="like-icon">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
         </svg>
-        {{ rating.like_count || 0 }}
+        {{ localLikeCount }}
       </button>
       
       <!-- Link to view replies -->
-      <router-link :to="{ name: 'comment-replies', params: { tconst: rating.movie_info?.tconst, comment: 'comment', comment_id: rating.id } }" class="blue-link">
+      <router-link :to="{ name: 'comment-replies', params: { tconst: rating.movie_info?.tconst, comment: 'comment', comment_id: rating.comment_id } }" class="blue-link">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chat-icon">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
@@ -46,10 +46,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import defaultAvatar from '@/assets/default-avatar.webp';
 import { withApiBase } from '@/utils/api';
+import axios from 'axios';
 
 const props = defineProps({
   rating: { type: Object, required: true },
@@ -60,6 +61,10 @@ const props = defineProps({
 });
 
 const router = useRouter();
+
+// Local state for like count and liked status
+const localLikeCount = ref(props.rating.like_count || 0);
+const isLiked = ref(props.rating.is_liked || false);
 
 const userValue = computed(() => props.rating?.user || null);
 
@@ -101,6 +106,43 @@ const avatarSrc = computed(() => {
   // otherwise return as-is
   return photo;
 });
+
+// Toggle like function
+async function toggleLike() {
+  const token = localStorage.getItem('access');
+  if (!token) {
+    // Redirect to login if not authenticated
+    router.push({ name: 'login' });
+    return;
+  }
+
+  // Use comment_id (required for this component to show action buttons)
+  const commentId = props.rating.comment_id;
+  
+  if (!commentId) {
+    console.error('No comment_id available for this rating');
+    return;
+  }
+  
+  const url = withApiBase(`/movies/comments/${commentId}/like/`);
+  
+  try {
+    const response = await axios.post(
+      url,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+
+    // Update local state with response
+    isLiked.value = response.data.liked;
+    localLikeCount.value = response.data.like_count;
+  } catch (error) {
+    console.error('Error toggling like:', error);
+    // Optionally show an error message to the user
+  }
+}
 </script>
 
 <style scoped>
@@ -167,10 +209,19 @@ const avatarSrc = computed(() => {
   align-items: center;
   gap: 0.25rem;
   font-size: 0.95rem;
+  transition: color 0.2s;
 }
 
 .like-button:hover {
   color: #1d4ed8;
+}
+
+.like-button.liked {
+  color: #ef4444;
+}
+
+.like-button.liked:hover {
+  color: #dc2626;
 }
 
 .like-icon {

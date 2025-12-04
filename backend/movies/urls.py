@@ -32,8 +32,8 @@ urlpatterns = [
     path('ratings/<str:tconst>/', UserMovieRatingAPIView.as_view(), name='rating-user-movie'),
     
     path('comments/<int:comment_id>/replies/', CommentRepliesListAPIView.as_view(), name='comment-replies-list'),
-    path('comments/<str:tconst>/', UserMovieCommentAPIView.as_view(), name='user-movie-comment'),
     path('comments/<int:comment_id>/like/', CommentLikeToggleAPIView.as_view(), name='comment-like-toggle'),
+    path('comments/<str:tconst>/', UserMovieCommentAPIView.as_view(), name='user-movie-comment'),
     
     # Rutas dinámicas 'catch-all' (que capturan cualquier string) AL FINAL
     path('<str:tconst>/ratings/', MovieRatingsListAPIView.as_view(), name='movie-ratings-list'),

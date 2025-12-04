@@ -196,7 +196,11 @@ onMounted(async () => {
           // Merge comment text into rating object
           return {
             ...rating,
-            comment: comment.text // Use comment text from Comment model
+            comment: comment.text, // Use comment text from Comment model
+            comment_id: comment.id, // Preserve comment ID for likes/replies
+            like_count: comment.like_count,
+            reply_count: comment.reply_count,
+            is_liked: comment.is_liked
           };
         })
         .filter(item => item !== null); // Remove nulls (comments without ratings)
