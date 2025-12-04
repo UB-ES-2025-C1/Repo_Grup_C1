@@ -260,6 +260,8 @@ class CommentSerializer(serializers.ModelSerializer):
         queryset=Comment.objects.all(), source='parent', required=False, allow_null=True
     )
     movie_tconst = serializers.CharField(write_only=True, required=False)
+    # Allow blank text for comments that are being cleared
+    text = serializers.CharField(allow_blank=True, required=False)
 
     class Meta:
         model = Comment
@@ -297,6 +299,12 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         tconst = validated_data.pop('movie_tconst', None)
+        # If movie_tconst not in payload, try to get it from the view context (URL kwargs)
+        if not tconst:
+            view = self.context.get('view')
+            if view:
+                tconst = view.kwargs.get('tconst')
+        
         user = self.context['request'].user
         
         if tconst:
@@ -399,24 +407,30 @@ class RatingSerializer(serializers.ModelSerializer):
 
         movie_serializer = MovieSerializer(movie)
 
-        # Send SSE notification
-        channel = f'movie:{movie.tconst}'
-        event = {
-            'type': 'new_rating',
-            'rating': {
-                'id': rating.id,
-                'movie_info': MovieMiniSerializer(rating.movie).data,
-                'user': self.get_user(rating),
-                'overall_score': rating.overall_score,
-                'soundtrack': rating.soundtrack,
-                'acting': rating.acting,
-                'cinematography': rating.cinematography,
-                'plot': rating.plot,
-                'date': str(rating.date),
-            },
-            'new_movie': movie_serializer.data,
-        }
-        publish_sse(channel, event)
+        # Send SSE notification (non-critical, don't fail if Redis is unavailable)
+        try:
+            channel = f'movie:{movie.tconst}'
+            event = {
+                'type': 'new_rating',
+                'rating': {
+                    'id': rating.id,
+                    'movie_info': MovieMiniSerializer(rating.movie).data,
+                    'user': self.get_user(rating),
+                    'overall_score': rating.overall_score,
+                    'soundtrack': rating.soundtrack,
+                    'acting': rating.acting,
+                    'cinematography': rating.cinematography,
+                    'plot': rating.plot,
+                    'date': str(rating.date),
+                },
+                'new_movie': movie_serializer.data,
+            }
+            publish_sse(channel, event)
+        except Exception as e:
+            # SSE is non-critical; log but don't fail the request
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f'Failed to publish SSE: {e}')
 
         return rating
     
@@ -424,21 +438,27 @@ class RatingSerializer(serializers.ModelSerializer):
     def rating_deleted(sender, instance, **kwargs):
         movie_serializer = MovieSerializer(instance.movie)
 
-        # Send SSE notification
-        channel = f'movie:{instance.movie.tconst}'
-        event = {
-            'type': 'deleted_rating',
-            'rating': {
-                'id': instance.id,
-                'movie_info': { 'tconst': instance.movie.tconst },
-                'user': {
-                    'id': instance.user.id,
-                    'username': instance.user.username
-                }
-            },
-            'new_movie': movie_serializer.data,
-        }
-        publish_sse(channel, event)
+        # Send SSE notification (non-critical, don't fail if Redis is unavailable)
+        try:
+            channel = f'movie:{instance.movie.tconst}'
+            event = {
+                'type': 'deleted_rating',
+                'rating': {
+                    'id': instance.id,
+                    'movie_info': { 'tconst': instance.movie.tconst },
+                    'user': {
+                        'id': instance.user.id,
+                        'username': instance.user.username
+                    }
+                },
+                'new_movie': movie_serializer.data,
+            }
+            publish_sse(channel, event)
+        except Exception as e:
+            # SSE is non-critical; log but don't fail the request
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f'Failed to publish SSE on delete: {e}')
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

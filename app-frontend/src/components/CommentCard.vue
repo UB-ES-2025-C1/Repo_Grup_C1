@@ -22,7 +22,26 @@
       </div>
     </div>
 
-    <p v-if="rating.comment" class="comment">"{{ rating.comment }}"</p>
+    <p v-if="rating.comment" class="comment">"{{ rating.comment.length > 1000 ? rating.comment.slice(0, 1000) + '...' : rating.comment }}"</p>
+
+    <!-- Action buttons -->
+    <div v-if="rating.id" class="action-buttons">
+      <!-- Like button -->
+      <button class="like-button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="like-icon">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+        </svg>
+        {{ rating.like_count || 0 }}
+      </button>
+      
+      <!-- Link to view replies -->
+      <router-link :to="{ name: 'comment-replies', params: { tconst: rating.movie_info?.tconst, comment: 'comment', comment_id: rating.id } }" class="blue-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chat-icon">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        {{ rating.reply_count || 0 }}
+      </router-link>
+    </div>
   </article>
 </template>
 
@@ -113,6 +132,54 @@ const avatarSrc = computed(() => {
 .avatar { width:36px; height:36px; border-radius:50%; object-fit:cover; border:1px solid rgba(0,0,0,0.06); margin-left:0.2rem; }
 .username { color: var(--primary); text-decoration:none; font-weight:600 }
 .username:hover { text-decoration:underline }
-.comment { margin-top:1.5rem; color: var(--text); font-style:italic }
+.comment { 
+  margin-top:1.5rem; 
+  color: var(--text); 
+  font-style:italic;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+  margin-left: auto;
+  margin-right: auto;
+  white-space: pre-wrap;
+}
 .no-comment { margin-top:0.8rem; color: var(--muted); font-style:italic }
+
+.action-buttons { 
+  margin-top:1rem; 
+  display:flex; 
+  flex-direction:row; 
+  align-items:center; 
+  justify-content:flex-end;
+  gap:1rem;
+  font-size:0.95rem;
+}
+
+.like-button {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.like-button:hover {
+  color: #1d4ed8;
+}
+
+.like-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-bottom: -2px;
+}
+
+.blue-link { color: #3b82f6; text-decoration:none; font-weight:500; display:inline-flex; align-items:center; gap:0.25rem }
+.blue-link:hover { text-decoration:underline }
+.chat-icon { display:inline-block; vertical-align:middle; margin-bottom: -2px }
 </style>

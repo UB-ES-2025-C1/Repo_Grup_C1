@@ -35,7 +35,11 @@
 
           <label>
             <p>Comment</p>
-            <textarea v-model="form.comment" rows="10"></textarea>
+            <textarea v-model="form.comment" rows="10" maxlength="1000"></textarea>
+            <div class="char-counter" :class="{ 'over-limit': commentLength > 1000, 'at-limit': commentLength === 1000 }">
+              {{ commentLength }} / 1000 characters
+              <span v-if="commentLength > 1000" class="warning-text"> ({{ commentLength - 1000 }} over limit)</span>
+            </div>
           </label>
 
           <div class="actions">
@@ -52,7 +56,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import AppHeader from '@/components/AppHeader.vue'
 import axios from 'axios';
 import { useRouter } from 'vue-router';
@@ -77,6 +81,9 @@ const form = ref({
   plot: 10,
   comment: ''
 });
+
+// Computed property for character count
+const commentLength = computed(() => form.value.comment.length);
 
 // Helper to get access token from localStorage
 function getAccessToken() {
@@ -274,6 +281,27 @@ input[type="number"], textarea, select {
 }
 textarea { min-height: 120px; resize: vertical; }
 
+.char-counter {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+  text-align: left;
+}
+
+.char-counter.at-limit {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.char-counter.over-limit {
+  color: #f43f5e;
+  font-weight: 600;
+}
+
+.warning-text {
+  font-weight: 700;
+}
+
 .actions { display:flex; gap:.5rem; margin-top: .5rem }
 .ghost { background:transparent; border:1px solid #334155; color: var(--text) }
 .error { color: #f43f5e }
@@ -288,7 +316,6 @@ textarea { min-height: 120px; resize: vertical; }
   transform: none !important;
   box-shadow: 0 8px 20px rgba(0,0,0,0.25) !important;
 }
-
 
 
 </style>
