@@ -256,11 +256,9 @@ class CommentRepliesListAPIView(generics.ListAPIView):
             like_count=Count('likes', distinct=True)
         ).order_by('created_at') # <--- ORDEN CRONOLÓGICO ASCENDENTE
 
-
+"""
 class CommentLikeToggleAPIView(APIView):
-    """
-    Permite dar o quitar like a un comentario.
-    """
+    "Permite dar o quitar like a un comentario."
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, comment_id):
@@ -278,7 +276,7 @@ class CommentLikeToggleAPIView(APIView):
             'liked': liked, 
             'like_count': comment.likes.count()
         }, status=status.HTTP_200_OK)
-
+"""
 
 class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.CreateAPIView):
     """
