@@ -131,19 +131,37 @@ onMounted(async () => {
     const response = await axios.get(withApiBase(`/movies/${props.tconst}/`));
     movie.value = response.data;
     // Check if authenticated user already has a rating for this movie
+    let userComment = null;
     try {
       const token = localStorage.getItem('access');
       if (token) {
+        // Get user's rating
         const ratingResp = await axios.get(withApiBase(`/movies/ratings/${props.tconst}/`), {
           headers: { Authorization: `Bearer ${token}` }
         });
-        // store preview data
         ratingPreview.value = ratingResp.data;
         hasUserRating.value = true;
+
+        // Get user's comment for this movie
+        try {
+          const commentResp = await axios.get(withApiBase(`/movies/comments/${props.tconst}/`), {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          userComment = commentResp.data;
+          // Add comment text to rating preview
+          if (userComment && userComment.text) {
+            ratingPreview.value.comment = userComment.text;
+          }
+        } catch (commentErr) {
+          // User doesn't have a comment yet, that's fine
+          if (commentErr.response?.status !== 404) {
+            console.warn('Error fetching user comment:', commentErr);
+          }
+        }
       } else {
         hasUserRating.value = false;
       }
-      } catch (ratingErr) {
+    } catch (ratingErr) {
       if (ratingErr.response && ratingErr.response.status === 404) {
         hasUserRating.value = false;
       } else {
@@ -151,37 +169,67 @@ onMounted(async () => {
         hasUserRating.value = false;
       }
     }
-      // Fetch public comments (other users' ratings) for this movie
-      try {
-        const commentsResp = await axios.get(withApiBase(`/movies/${props.tconst}/ratings/`));
-        // Exclude possible duplicate of the authenticated user's rating (we'll show it separately)
-        let fetched = commentsResp.data || [];
-        if (hasUserRating.value && ratingPreview.value) {
-          fetched = fetched.filter((r) => {
-            if (!r) return false;
-            if (r.id && ratingPreview.value.id) return r.id !== ratingPreview.value.id;
-            if (r.user && ratingPreview.value.user) return r.user.username !== ratingPreview.value.user.username;
-            return true;
-          });
-        }
-        // Keep only ratings that include a non-empty comment
-        fetched = fetched.filter((r) => r && r.comment && String(r.comment).trim().length > 0);
-        // Sort newest-first by date (fallback to id)
-        fetched.sort((a, b) => {
-          const da = a?.date ? new Date(a.date).getTime() : 0;
-          const db = b?.date ? new Date(b.date).getTime() : 0;
-          if (da === db) return (b.id || 0) - (a.id || 0);
-          return db - da;
-        });
-        comments.value = fetched;
-        commentsAll.value = fetched;
+    // Fetch all root comments and all ratings for this movie
+    try {
+      // Get all root comments (parent=null)
+      const commentsResp = await axios.get(withApiBase(`/movies/${props.tconst}/comments/`));
+      const allComments = commentsResp.data || [];
 
-        subscribeToMovie();
-      } catch (cErr) {
-        // non-fatal: just keep comments empty
-        console.warn('Could not fetch comments for movie', cErr);
-        comments.value = [];
+      // Get all ratings
+      const ratingsResp = await axios.get(withApiBase(`/movies/${props.tconst}/ratings/`));
+      const allRatings = ratingsResp.data || [];
+
+      // Create a map of ratings by username for quick lookup
+      const ratingsByUsername = {};
+      allRatings.forEach(rating => {
+        if (rating.user?.username) {
+          ratingsByUsername[rating.user.username] = rating;
+        }
+      });
+
+      // Combine comments with their associated ratings
+      let combinedData = allComments
+        .map(comment => {
+          const rating = ratingsByUsername[comment.username];
+          if (!rating) return null; // Skip comments without rating
+          
+          // Merge comment text into rating object
+          return {
+            ...rating,
+            comment: comment.text // Use comment text from Comment model
+          };
+        })
+        .filter(item => item !== null); // Remove nulls (comments without ratings)
+
+      // Exclude the authenticated user's rating (we show it separately)
+      if (hasUserRating.value && ratingPreview.value?.user?.username) {
+        combinedData = combinedData.filter(r => 
+          r.user?.username !== ratingPreview.value.user.username
+        );
       }
+
+      // Sort newest-first by date
+      combinedData.sort((a, b) => {
+        const da = a?.date ? new Date(a.date).getTime() : 0;
+        const db = b?.date ? new Date(b.date).getTime() : 0;
+        if (da === db) return (b.id || 0) - (a.id || 0);
+        return db - da;
+      });
+
+      comments.value = combinedData;
+      commentsAll.value = combinedData;
+
+      // Try to subscribe to SSE, but don't fail if it's not available
+      try {
+        subscribeToMovie();
+      } catch (sseErr) {
+        console.warn('SSE not available, app will work without real-time updates:', sseErr);
+      }
+    } catch (cErr) {
+      // non-fatal: just keep comments empty
+      console.warn('Could not fetch comments or ratings for movie', cErr);
+      comments.value = [];
+    }
   } catch (err) {
     console.error(err);
     error.value = 'Could not fetch movie details.';
@@ -209,13 +257,25 @@ async function deleteRating() {
   }
 
   try {
+    // Delete the rating
     await axios.delete(withApiBase(`/movies/ratings/${props.tconst}/`), {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    deleteSuccess.value = '';
+    // Also delete the associated comment
+    try {
+      await axios.delete(withApiBase(`/movies/comments/${props.tconst}/`), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (commentErr) {
+      // Comment deletion failed, but rating was deleted - still show success
+      console.warn('Comment deletion failed (but rating was deleted):', commentErr);
+    }
+
+    deleteSuccess.value = 'Rating and comment deleted successfully.';
     hasUserRating.value = false;
     ratingPreview.value = null;
+    commentsAll.value = []; // Clear comments after delete
 
     // Refresh movie data to update numVotes / average_rating
     try {
@@ -225,9 +285,13 @@ async function deleteRating() {
       console.warn('Could not refresh movie after delete', fetchErr);
     }
   } catch (err) {
-    console.error(err);
+    console.error('Delete rating error:', err);
     if (err.response && err.response.data) {
-      deleteError.value = err.response.data.detail || JSON.stringify(err.response.data);
+      deleteError.value = typeof err.response.data === 'string' 
+        ? err.response.data 
+        : err.response.data.detail || JSON.stringify(err.response.data);
+    } else if (err.message) {
+      deleteError.value = err.message;
     } else {
       deleteError.value = 'Error deleting rating.';
     }
@@ -247,23 +311,17 @@ async function deleteComment() {
     return;
   }
 
-  // Build payload using existing rating preview values, but with empty comment
-  const payload = {
-    movie: props.tconst,
-    overall_score: ratingPreview.value?.overall_score ?? 0,
-    soundtrack: ratingPreview.value?.soundtrack ?? 0,
-    acting: ratingPreview.value?.acting ?? 0,
-    cinematography: ratingPreview.value?.cinematography ?? 0,
-    plot: ratingPreview.value?.plot ?? 0,
-    comment: ''
+  // Only update the comment to empty string, don't touch the rating
+  const commentPayload = {
+    text: '' // Empty string to clear comment
   };
 
   try {
-    await axios.post(withApiBase(`/movies/ratings/`), payload, {
+    await axios.patch(withApiBase(`/movies/comments/${props.tconst}/`), commentPayload, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    commentDeleteSuccess.value = '';
+    commentDeleteSuccess.value = 'Comment deleted successfully.';
     // update local preview
     if (ratingPreview.value) ratingPreview.value.comment = '';
 
@@ -286,44 +344,56 @@ async function deleteComment() {
 }
 
 function subscribeToMovie() {
-  sse = new EventSource(withSseBase('/sse/stream'));
+  try {
+    sse = new EventSource(withSseBase('/sse/stream'));
 
-  sse.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      console.log(data);
+    sse.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log(data);
 
-      if (data.type === 'client_id') {
-        clientId = data.client_id;
-        localStorage.setItem('sse_client_id', clientId);
+        if (data.type === 'client_id') {
+          clientId = data.client_id;
+          localStorage.setItem('sse_client_id', clientId);
 
-        axios.post(`${withSseBase('/sse/subscribe')}/movie:${tconst}`, { client_id: clientId })
-          .catch(console.warn);
-        return;
-      }
-
-      if (data.type === 'new_rating' && data.rating?.movie_info?.tconst === tconst) {
-        movie.value = data.new_movie;
-        const index = commentsAll.value.findIndex(r => r.id === data.rating.id);
-        if (index === -1 && data.rating?.comment) commentsAll.value.unshift(data.rating);  //  New rating with comment
-        if (index !== -1 && !data.rating?.comment) commentsAll.value.splice(index, 1);  // Comment removed from existing rating
-        if (index !== -1 && data.rating?.comment) {  // Rating or comment modified but not removed
-          commentsAll.value.splice(index, 1);
-          commentsAll.value.unshift(data.rating);
+          axios.post(`${withSseBase('/sse/subscribe')}/movie:${tconst}`, { client_id: clientId })
+            .catch(console.warn);
+          return;
         }
-      }
 
-      if (data.type === 'deleted_rating' && data.rating?.movie_info?.tconst === tconst) {
-        movie.value = data.new_movie;
-        const index = commentsAll.value.findIndex(r => r.id === data.rating.id);
-        if (index !== -1) commentsAll.value.splice(index, 1);
-      }
-    } catch (err) {
-      console.error('SSE message parse error', err);
-    }
-  };
+        if (data.type === 'new_rating' && data.rating?.movie_info?.tconst === tconst) {
+          movie.value = data.new_movie;
+          const index = commentsAll.value.findIndex(r => r.id === data.rating.id);
+          if (index === -1 && data.rating?.comment) commentsAll.value.unshift(data.rating);  //  New rating with comment
+          if (index !== -1 && !data.rating?.comment) commentsAll.value.splice(index, 1);  // Comment removed from existing rating
+          if (index !== -1 && data.rating?.comment) {  // Rating or comment modified but not removed
+            commentsAll.value.splice(index, 1);
+            commentsAll.value.unshift(data.rating);
+          }
+        }
 
-  sse.onerror = (err) => console.error('SSE error', err);
+        if (data.type === 'deleted_rating' && data.rating?.movie_info?.tconst === tconst) {
+          movie.value = data.new_movie;
+          const index = commentsAll.value.findIndex(r => r.id === data.rating.id);
+          if (index !== -1) commentsAll.value.splice(index, 1);
+        }
+      } catch (err) {
+        console.error('SSE message parse error', err);
+      }
+    };
+
+    sse.onerror = (err) => {
+      console.error('SSE error', err);
+      // Close the connection on error to avoid repeated reconnection attempts
+      if (sse) {
+        sse.close();
+        sse = null;
+      }
+    };
+  } catch (err) {
+    console.warn('Could not establish SSE connection:', err);
+    // SSE is non-critical; app continues to work without it
+  }
 }
 
 function unsubscribeFromMovie() {
@@ -332,6 +402,8 @@ function unsubscribeFromMovie() {
   sse.close();
   sse = null;
 }
+
+
 </script>
 
 <style scoped>

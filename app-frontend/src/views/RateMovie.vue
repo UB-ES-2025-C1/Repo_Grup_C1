@@ -116,6 +116,21 @@ onMounted(async () => {
     form.value.plot = data.plot ?? 0;
     form.value.comment = data.comment ?? '';
 
+    // Also try to fetch user's comment
+    try {
+      const commentResp = await axios.get(withApiBase(`/movies/comments/${tconst}/`), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (commentResp.data && commentResp.data.text) {
+        form.value.comment = commentResp.data.text;
+      }
+    } catch (commentErr) {
+      // No existing comment yet, that's fine - leave form.value.comment as is
+      if (commentErr.response?.status !== 404) {
+        console.warn('Error fetching existing comment:', commentErr);
+      }
+    }
+
   } catch (err) {
     if (err.response && err.response.status === 404) {
       // user has not rated yet - leave defaults
@@ -150,12 +165,39 @@ async function submitRating() {
   };
 
   try {
-    // Try to create or update via POST to ratings/ which in backend updates existing
-    const resp = await axios.post(withApiBase(`/movies/ratings/`), payload, {
+    // Create or update rating
+    const ratingResp = await axios.post(withApiBase(`/movies/ratings/`), payload, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    success.value = 'Rating saved successfully.';
+    // Also create or update comment (always, even if empty)
+    const commentPayload = {
+      text: form.value.comment || '' // Empty string if no comment
+    };
+
+    try {
+      // Try PATCH first (update existing comment)
+      try {
+        await axios.patch(withApiBase(`/movies/comments/${tconst}/`), commentPayload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (patchErr) {
+        // If 404, comment doesn't exist yet - create it with POST
+        if (patchErr.response?.status === 404) {
+          await axios.post(withApiBase(`/movies/comments/${tconst}/`), commentPayload, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } else {
+          // Other error - re-throw
+          throw patchErr;
+        }
+      }
+    } catch (commentErr) {
+      // Comment creation/update failed, but rating succeeded - still show success
+      console.warn('Comment creation/update failed:', commentErr);
+    }
+
+    success.value = 'Rating and comment saved successfully.';
     // After saving, navigate back to movie detail
     router.push({ name: 'movie-info', params: { tconst } });
   } catch (err) {
