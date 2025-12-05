@@ -2,38 +2,36 @@
   <AppHeader />
 
   <div class="forum-container">
-    <!-- Loading & Error -->
+    <!-- Mensajes de carga o error -->
     <div v-if="loading" class="empty">Loading forum...</div>
     <div v-else-if="error" class="empty">⚠️ {{ error }}</div>
 
     <template v-else>
       <h2 class="forum-title">{{ forum?.title }}</h2>
 
-      <!-- Messages -->
-      <div class="messages" ref="messagesBox">
-        <div
-          v-for="msg in messages"
-          :key="msg.id"
-          class="message"
-        >
-          <div class="author">{{ msg.username }}</div>
-          <div class="content">{{ msg.text }}</div>
-          <div class="timestamp">{{ formatDate(msg.created_at) }}</div>
-        </div>
+      <!-- Posts -->
+      <div class="posts" ref="postsBox">
+        <ForumPostCard
+          v-for="post in posts"
+          :key="post.id"
+          :post="post"
+          profileRouteName="user-profile"
+          class="post"
+        />
       </div>
 
       <!-- Chat input -->
       <div class="input-bar">
         <input
           type="text"
-          placeholder="Write a message..."
-          v-model="messageText"
-          @keyup.enter="sendMessage"
+          placeholder="Write a post..."
+          v-model="postText"
+          @keyup.enter="sendpost"
         />
 
         <button
           class="send-btn"
-          @click="sendMessage"
+          @click="sendpost"
           :disabled="sending"
         >
           Send
@@ -45,6 +43,7 @@
 
 <script setup>
 import AppHeader from '@/components/AppHeader.vue'
+import ForumPostCard from '@/components/ForumPostCard.vue'
 import axios from 'axios'
 import { withApiBase } from '@/utils/api'
 import { withSseBase } from '@/utils/sse'
@@ -56,23 +55,23 @@ const forumId = route.params.id
 
 // --- STATE ---
 const forum = ref(null)
-const messages = ref([])
+const posts = ref([])
 const loading = ref(true)
 const error = ref(null)
 
-const messageText = ref('')
+const postText = ref('')
 const sending = ref(false)
 
 // SSE
 let sse = null
 let clientId = localStorage.getItem('sse_client_id') || null
 
-const messagesBox = ref(null)
+const postsBox = ref(null)
 
 function scrollToBottom() {
   nextTick(() => {
-    if (messagesBox.value) {
-      messagesBox.value.scrollTop = messagesBox.value.scrollHeight
+    if (postsBox.value) {
+      postsBox.value.scrollTop = postsBox.value.scrollHeight
     }
   })
 }
@@ -84,7 +83,7 @@ onMounted(async () => {
     forum.value = resForum.data
 
     const resPosts = await axios.get(withApiBase(`/movies/forums/${forumId}/posts/`))
-    messages.value = resPosts.data || []
+    posts.value = resPosts.data || []
   } catch (err) {
     error.value = 'Failed to load forum.'
   } finally {
@@ -99,22 +98,18 @@ onBeforeUnmount(() => {
   unsubscribeFromForum()
 })
 
-function formatDate(d) {
-  return new Date(d).toLocaleString()
-}
-
-// --- SEND MESSAGE ---
-async function sendMessage() {
-  if (!messageText.value.trim() || sending.value) return
+// --- SEND post ---
+async function sendpost() {
+  if (!postText.value.trim() || sending.value) return
 
   sending.value = true
 
   try {
     await axios.post(withApiBase(`/movies/forums/${forumId}/posts/`), {
-      text: messageText.value
+      text: postText.value
     })
 
-    messageText.value = ''
+    postText.value = ''
   } catch (err) {
     console.error(err)
   } finally {
@@ -126,7 +121,7 @@ async function sendMessage() {
 function subscribeToForum() {
   sse = new EventSource(withSseBase('/sse/stream'))
 
-  sse.onmessage = (event) => {
+  sse.onpost = (event) => {
     try {
       const data = JSON.parse(event.data)
       console.log(data)
@@ -141,7 +136,7 @@ function subscribeToForum() {
       }
 
       if (data.type === 'new_forum_post' && data.forum_info.id == forumId) {
-        messages.value.push(data.forum_post)
+        posts.value.push(data.forum_post)
         scrollToBottom()
       }
 
@@ -179,33 +174,13 @@ function unsubscribeFromForum() {
   font-weight: 700;
 }
 
-.messages {
+.posts {
   border: 1px solid #333;
   border-radius: 8px;
   padding: 1rem;
   height: 60vh;
   overflow-y: auto;
   background: #111827;
-}
-
-.message {
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #333;
-}
-
-.author {
-  font-weight: bold;
-  color: #60a5fa;
-}
-
-.content {
-  margin: 0.25rem 0;
-}
-
-.timestamp {
-  font-size: 0.75rem;
-  color: #aaa;
 }
 
 .input-bar {
