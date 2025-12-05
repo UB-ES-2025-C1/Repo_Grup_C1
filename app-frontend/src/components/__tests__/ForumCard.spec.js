@@ -1,4 +1,5 @@
 // app-frontend/src/components/__tests__/ForumCard.spec.js
+import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ForumCard from '@/components/ForumCard.vue'
 

@@ -1,4 +1,5 @@
 // app-frontend/src/components/__tests__/ForumFilter.spec.js
+import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ForumFilter from '@/components/ForumFilter.vue'
 

@@ -68,7 +68,7 @@ const createForum = async () => {
       error.value = 'Failed to create forum.';
     }
   } finally {
-    this.loading = false;
+    loading.value = false;
   }
 }
 </script>
