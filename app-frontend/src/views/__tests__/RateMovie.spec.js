@@ -5,6 +5,13 @@ import RateMovie from '@/views/RateMovie.vue'
 
 // --- Mocks globales ---
 
+// Mock EventSource (prevent SSE connections)
+global.EventSource = vi.fn().mockImplementation(() => ({
+  close: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn()
+}))
+
 // Mock axios
 vi.mock('axios', () => ({
   default: {
@@ -17,6 +24,11 @@ vi.mock('axios', () => ({
 vi.mock('@/utils/api', () => ({
   getApiBaseUrl: () => 'http://api.test',
   withApiBase: (path) => `http://api.test${path}`
+}))
+
+// Mock SSE helper
+vi.mock('@/utils/sse', () => ({
+  withSseBase: (path) => `http://sse.test${path}`
 }))
 
 // Mock vue-router: useRouter (para router.push)
@@ -93,6 +105,31 @@ const mountRateMovie = async (options = {}) => {
       return { data: sampleRating }
     }
 
+    // Handle comment endpoint (used in RateMovie to prefill existing comment)
+    if (url === `http://api.test/movies/comments/${TCONST}/`) {
+      if (!withExistingRating) {
+        const err = new Error('Not found')
+        err.response = { status: 404 }
+        throw err
+      }
+      return { data: { text: sampleRating.comment } }
+    }
+
+    // AppHeader profile call (when authenticated)
+    if (url === 'http://api.test/movies/profiles/me/') {
+      if (!hasToken) {
+        const err = new Error('Unauthorized')
+        err.response = { status: 401 }
+        throw err
+      }
+      return { 
+        data: { 
+          username: 'fake-username',
+          avatar: 'fake-avatar'
+        } 
+      }
+    }
+
     return { data: {} }
   })
 
@@ -156,13 +193,19 @@ describe('RateMovie', () => {
     expect(form.plot).toBe(sampleRating.plot)
     expect(form.comment).toBe(sampleRating.comment)
 
-    // Se han hecho 2 peticiones: movie + rating
-    expect(axios.get).toHaveBeenCalledTimes(2)
+    // Se han hecho 4 peticiones: movie + rating + comment + profile (AppHeader)
+    expect(axios.get).toHaveBeenCalledTimes(4)
     expect(axios.get).toHaveBeenCalledWith(
       `http://api.test/movies/${TCONST}/`
     )
     expect(axios.get).toHaveBeenCalledWith(
       `http://api.test/movies/ratings/${TCONST}/`,
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer fake-token' }
+      })
+    )
+    expect(axios.get).toHaveBeenCalledWith(
+      `http://api.test/movies/comments/${TCONST}/`,
       expect.objectContaining({
         headers: { Authorization: 'Bearer fake-token' }
       })

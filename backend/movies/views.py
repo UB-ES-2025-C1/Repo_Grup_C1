@@ -223,14 +223,15 @@ def get_all_users(request):
 
 class MovieCommentsListAPIView(generics.ListAPIView):
     """
-    Lista los comentarios RAÍZ.
-    ORDEN: Primero los que tienen más likes, luego los más recientes.
+    Lista los comentarios RAÍZ de una película.
+    NO incluye las respuestas anidadas, solo el número de respuestas (reply_count).
     """
     serializer_class = CommentSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         tconst = self.kwargs.get('tconst')
+        # Filtramos solo los padres y ANOTAMOS (contamos) sus respuestas
         return Comment.objects.filter(
             movie__tconst=tconst, 
             parent__isnull=True
@@ -242,14 +243,14 @@ class MovieCommentsListAPIView(generics.ListAPIView):
 
 class CommentRepliesListAPIView(generics.ListAPIView):
     """
-    Lista las respuestas.
-    ORDEN: Cronológico (Ascendente), los likes no afectan al orden aquí.
+    Devuelve solo las respuestas de un comentario específico.
     """
     serializer_class = CommentSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         comment_id = self.kwargs.get('comment_id')
+        # Obtenemos comentarios cuyo padre sea el ID pasado en la URL
         return Comment.objects.filter(
             parent__id=comment_id
         ).select_related('user', 'user__profile').prefetch_related('likes').annotate(
@@ -257,11 +258,9 @@ class CommentRepliesListAPIView(generics.ListAPIView):
             like_count=Count('likes', distinct=True)
         ).order_by('created_at') # <--- ORDEN CRONOLÓGICO ASCENDENTE
 
-
+"""
 class CommentLikeToggleAPIView(APIView):
-    """
-    Permite dar o quitar like a un comentario.
-    """
+    "Permite dar o quitar like a un comentario."
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, comment_id):
@@ -279,7 +278,7 @@ class CommentLikeToggleAPIView(APIView):
             'liked': liked, 
             'like_count': comment.likes.count()
         }, status=status.HTTP_200_OK)
-
+"""
 
 class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.CreateAPIView):
     """
@@ -290,14 +289,21 @@ class UserMovieCommentAPIView(generics.RetrieveUpdateDestroyAPIView, generics.Cr
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        return Comment.objects.select_related('user').annotate(
+            reply_count=Count('replies'),
+            like_count=Count('likes')
+        )
+
     def get_object(self):
         # Obtiene TU comentario principal sobre la película (no respuestas)
         tconst = self.kwargs.get('tconst')
         user = self.request.user
         movie = get_object_or_404(Movie, tconst=tconst)
         
-        # Buscamos solo el comentario raíz (parent=None)
-        obj = get_object_or_404(Comment, movie=movie, user=user, parent__isnull=True)
+        # Buscamos solo el comentario raíz (parent=None) usando the queryset with annotations
+        queryset = self.get_queryset()
+        obj = get_object_or_404(queryset, movie=movie, user=user, parent__isnull=True)
         self.check_object_permissions(self.request, obj)
         return obj
 
@@ -348,6 +354,34 @@ class CommentLikeToggleAPIView(APIView):
             'liked': liked, 
             'like_count': comment.likes.count()
         }, status=status.HTTP_200_OK)
+
+class CommentUpdateAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Permite actualizar o eliminar un comentario específico por su ID.
+    Solo el autor del comentario puede editarlo o eliminarlo.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'pk'
+    lookup_url_kwarg = 'comment_id'
+
+    def get_queryset(self):
+        return Comment.objects.select_related('user').annotate(
+            reply_count=Count('replies'),
+            like_count=Count('likes')
+        )
+
+    def get_object(self):
+        comment = super().get_object()
+        # Verificar que el usuario es el autor del comentario
+        # Compare by ID to avoid issues with object comparison
+        if comment.user.id != self.request.user.id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("No tienes permiso para editar este comentario.")
+        return comment
+    
+    def perform_update(self, serializer):
+        serializer.save()
     
 class ForumListCreateAPIView(generics.ListCreateAPIView):
     """
