@@ -50,12 +50,22 @@
     <!-- Action buttons -->
     <div v-if="rating.comment_id || rating.id" class="action-buttons">
       <!-- Edit button - only show if user is the owner -->
-      <button v-if="isOwner && !isEditing" class="edit-button" @click="startEdit" title="Edit comment">
+      <button v-if="isOwner && !isEditing && isReply" class="edit-button" @click="startEdit" title="Edit comment">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
         </svg>
         Edit comment
+      </button>
+      <button
+        v-if="isOwner && !isEditing && isReply"
+        class="delete-button"
+        @click="deleteComment"
+        title="Delete comment"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        </svg>
+        Delete comment
       </button>
       
       <!-- Like button -->
@@ -65,7 +75,15 @@
         </svg>
         {{ displayLikeCount }}
       </button>
-      
+
+      <!-- Reply button - only for replies -->
+      <button v-if="isReply" class="reply-button" @click="startReply">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        Reply
+      </button>
+
       <!-- Link to view replies - only show for root comments -->
       <router-link v-if="!isReply" :to="{ name: 'comment-replies', params: { tconst: rating.movie_info?.tconst || rating.movie?.tconst, comment: 'comment', comment_id: rating.comment_id || rating.id } }" class="blue-link">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chat-icon">
@@ -74,8 +92,28 @@
         {{ rating.reply_count || 0 }}
       </router-link>
     </div>
+
+    <!-- Reply form (appear below action buttons) -->
+    <div v-if="isReplying" class="reply-form">
+      <textarea 
+        v-model="replyText" 
+        @input="checkPrefix"
+        maxlength="1000" 
+        rows="3" 
+        class="edit-textarea"
+      ></textarea>
+      <div class="char-counter" :class="{ 'at-limit': replyText.length === 1000, 'over-limit': replyText.length > 1000 }">
+        {{ replyText.length }} / 1000 characters
+      </div>
+      <div class="edit-actions">
+        <button @click="sendReply" class="save-btn" :disabled="replyText.length === 0 || replyText.length > 1000">Send</button>
+        <button @click="cancelReply" class="cancel-btn">Cancel</button>
+      </div>
+    </div>
+    
   </article>
 </template>
+
 
 <script setup>
 import { ref, computed } from 'vue';
@@ -83,6 +121,8 @@ import { useRouter } from 'vue-router';
 import defaultAvatar from '@/assets/default-avatar.webp';
 import { withApiBase } from '@/utils/api';
 import axios from 'axios';
+
+const emit = defineEmits(['deleted']);
 
 const props = defineProps({
   rating: { type: Object, required: true },
@@ -297,6 +337,66 @@ async function saveEdit() {
     saving.value = false;
   }
 }
+
+async function deleteComment() {
+  const token = localStorage.getItem('access');
+  if (!token) {
+    router.push({ name: 'login' });
+    return;
+  }
+
+  const commentId = props.rating.comment_id || props.rating.id;
+  if (!commentId) return;
+
+  try {
+    await axios.delete(withApiBase(`/movies/comments/${commentId}/`), {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    // Emitimos al padre para actualizar la lista localmente
+    emit('deleted', commentId);
+  } catch (err) {
+    console.error('Error deleting comment:', err);
+    alert('Failed to delete comment. Please try again.');
+  }
+}
+
+const isReplying = ref(false);
+
+function startReply() {
+  isReplying.value = true;
+  replyText.value = `@${displayName.value} `;
+}
+
+function cancelReply() {
+  isReplying.value = false;
+  replyText.value = '';
+}
+
+
+function sendReply() {
+  // Emitimos el texto de la reply al padre
+  emit('reply', replyText.value);
+  isReplying.value = false;
+  replyText.value = '';
+}
+
+const replyText = ref('');
+const prefix = ref(`@${displayName.value} `);
+
+
+function checkPrefix(e) {
+  if (!replyText.value.startsWith(prefix.value)) {
+    replyText.value = prefix.value;
+    // opcional: mover el cursor al final
+    nextTick(() => {
+      const textarea = e.target;
+      textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+    });
+  }
+}
+
+
 </script>
 
 <style scoped>
@@ -390,12 +490,31 @@ async function saveEdit() {
   gap: 0.5rem;
   font-size: 0.95rem;
   transition: color 0.2s;
-  margin-right: auto; /* Push to left side */
+  margin-right: 0;
 }
 
 .edit-button:hover {
   color: #3b82f6;
 }
+
+.delete-button {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+  margin-right: 420px;
+}
+
+.delete-button:hover {
+  color: #c21717;
+}
+
 
 .like-button {
   background: none;
@@ -524,4 +643,28 @@ async function saveEdit() {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.reply-button {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.reply-button:hover {
+  color: #1d4ed8;
+}
+
+.reply-form {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 </style>

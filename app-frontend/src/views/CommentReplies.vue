@@ -1,6 +1,13 @@
 <template>
   <AppHeader />
 
+  <!-- Back button -->
+  <div class="back-button-container">
+    <button @click="goBack" class="back-btn">
+      ← Back
+    </button>
+  </div>
+
   <div class="container">
     <!-- Loading state -->
     <div v-if="loading" class="empty">Loading replies...</div>
@@ -52,9 +59,16 @@
       <div class="replies-section">
         <h2>Replies ({{ replies.length }})</h2>
         <p v-if="!replies || replies.length === 0" class="no-replies">No replies yet. Be the first to reply!</p>
-        
+
         <div v-else class="replies">
-          <CommentCard v-for="reply in replies" :key="reply.id" :rating="reply" profileRouteName="user-profile" />
+          <CommentCard v-for="reply in displayedReplies" :key="reply.id" :rating="reply" profileRouteName="user-profile" @deleted="handleReplyDeleted" @reply="submitReplyFromCard"/>
+        </div>
+
+        <!-- Botón para cargar más respuestas -->
+        <div v-if="replies.length > displayedRepliesCount" class="load-more-container">
+          <button @click="loadMoreReplies" class="load-more-btn">
+            Load more replies
+          </button>
         </div>
       </div>
     </div>
@@ -226,6 +240,52 @@ function cancelReply() {
   showReplyForm.value = false;
 }
 
+function goBack() {
+  router.push({ name: 'movie-info', params: { tconst } });
+}
+
+const displayedRepliesCount = ref(10); // inicialmente mostramos 10
+
+// Computed para las respuestas que se muestran actualmente
+import { computed } from 'vue';
+const displayedReplies = computed(() => replies.value.slice(0, displayedRepliesCount.value));
+
+// Función para cargar más respuestas
+function loadMoreReplies() {
+  displayedRepliesCount.value += 3; // cada vez añadimos 3 más
+}
+
+function handleReplyDeleted(commentId) {
+  // Filtramos la respuesta eliminada
+  replies.value = replies.value.filter(r => r.id !== commentId);
+}
+
+async function submitReplyFromCard(replyTextFromCard) {
+  if (!replyTextFromCard.trim()) return;
+  submitting.value = true;
+
+  try {
+    const payload = {
+      movie_tconst: tconst,
+      parent_id: parseInt(comment_id),
+      text: replyTextFromCard.trim()
+    };
+
+    await axios.post(
+      withApiBase(`/movies/comments/${tconst}/`),
+      payload,
+      { headers: { Authorization: `Bearer ${localStorage.getItem('access')}` } }
+    );
+
+    await loadReplies();
+  } catch (err) {
+    console.error('Failed to send reply:', err);
+    alert('Failed to send reply.');
+  } finally {
+    submitting.value = false;
+  }
+}
+
 onMounted(async () => {
   try {
     await Promise.all([loadParentComment(), loadReplies()]);
@@ -378,12 +438,14 @@ onMounted(async () => {
 
 .replies-section {
   margin-top: 2rem;
+  
 }
 
 .replies-section h2 {
   margin-bottom: 1.5rem;
   color: var(--text);
   font-size: 1.5rem;
+  
 }
 
 .no-replies {
@@ -396,5 +458,51 @@ onMounted(async () => {
 .replies {
   display: grid;
   gap: 1.25rem;
+  
 }
+
+.back-button-container {
+  display: flex;
+  justify-content: flex-end;
+  margin: 1rem 0;
+}
+
+.back-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-right: 50px;
+}
+
+.back-btn:hover {
+  background: #1d4ed8;
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.load-more-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 30px;
+}
+
+.load-more-btn:hover {
+  background: #1d4ed8;
+}
+
 </style>
