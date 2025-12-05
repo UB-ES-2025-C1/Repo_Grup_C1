@@ -17,20 +17,26 @@ jobs:
         run: |
           ISSUE_TITLE="${{ github.event.issue.title }}"
           
-          # Extraer USX.X y TaskX del formato "USX.X-TaskX" o "USX.X-TaskX - Título"
-          # El regex captura hasta el primer espacio después del guion para ignorar el título descriptivo
-          if [[ "$ISSUE_TITLE" =~ ^([^-]+)-([^[:space:]]+)(.*)?$ ]]; then
+          # Extraer USX.X y TaskX del formato "USX.X-TaskX - Título"
+          # Captura USX.X hasta el primer guion, y TaskX hasta el primer espacio o guion (sin el título)
+          if [[ "$ISSUE_TITLE" =~ ^([^-]+)-([^[:space:]-]+)(.*)?$ ]]; then
             US_BRANCH="${BASH_REMATCH[1]}"
             TASK_BRANCH="${BASH_REMATCH[2]}"
+            
+            # El nombre de la rama final será US-Task (ej: us4.2.2-task0)
+            FINAL_TASK_BRANCH="${US_BRANCH}-${TASK_BRANCH}"
+            
             echo "us_branch=$US_BRANCH" >> "$GITHUB_OUTPUT"
             echo "task_branch=$TASK_BRANCH" >> "$GITHUB_OUTPUT"
-            echo "branch_name=${US_BRANCH}-${TASK_BRANCH}" >> "$GITHUB_OUTPUT"
+            echo "final_task_branch=$FINAL_TASK_BRANCH" >> "$GITHUB_OUTPUT"
+            echo "branch_name=$FINAL_TASK_BRANCH" >> "$GITHUB_OUTPUT"
           else
             # Si no sigue el formato, usar el título completo como antes
-          SAFE_TITLE=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')
+            SAFE_TITLE=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')
             echo "branch_name=$SAFE_TITLE" >> "$GITHUB_OUTPUT"
             echo "us_branch=" >> "$GITHUB_OUTPUT"
             echo "task_branch=" >> "$GITHUB_OUTPUT"
+            echo "final_task_branch=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Clonar y crear branches
@@ -39,6 +45,7 @@ jobs:
           BRANCH_NAME: ${{ steps.issue_info.outputs.branch_name }}
           US_BRANCH: ${{ steps.issue_info.outputs.us_branch }}
           TASK_BRANCH: ${{ steps.issue_info.outputs.task_branch }}
+          FINAL_TASK_BRANCH: ${{ steps.issue_info.outputs.final_task_branch }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -98,14 +105,28 @@ jobs:
             git checkout ${US_BRANCH}
             git pull origin ${US_BRANCH} || true
             
-            # Crear la rama TaskX desde USX.X
-            echo "Creando la rama ${TASK_BRANCH} desde ${US_BRANCH}"
-            git checkout -b ${TASK_BRANCH}
-            
-            # Si el push falla porque la rama TaskX ya existe, es un error (no debería pasar)
-            if ! git push origin ${TASK_BRANCH}; then
-              echo "Error: La rama ${TASK_BRANCH} ya existe o hubo un problema al crearla"
-              exit 1
+            # Verificar si la rama Task ya existe
+            git fetch origin
+            if git show-ref --verify --quiet refs/remotes/origin/${FINAL_TASK_BRANCH}; then
+              echo "La rama ${FINAL_TASK_BRANCH} ya existe, no se creará de nuevo"
+            else
+              # Crear la rama Task desde USX.X (nombre completo: US-Task)
+              echo "Creando la rama ${FINAL_TASK_BRANCH} desde ${US_BRANCH}"
+              git checkout -b ${FINAL_TASK_BRANCH}
+              
+              # Intentar hacer push, si falla porque ya existe (race condition), no es un error
+              PUSH_EXIT_CODE=0
+              PUSH_OUTPUT=$(git push origin ${FINAL_TASK_BRANCH} 2>&1) || PUSH_EXIT_CODE=$?
+              
+              if [ $PUSH_EXIT_CODE -eq 0 ]; then
+                echo "Rama ${FINAL_TASK_BRANCH} creada exitosamente"
+              elif echo "$PUSH_OUTPUT" | grep -qiE "already exists|remote.*already"; then
+                echo "La rama ${FINAL_TASK_BRANCH} ya existe (creada por otro proceso), continuando..."
+              else
+                echo "Error al crear la rama ${FINAL_TASK_BRANCH}"
+                echo "Output: $PUSH_OUTPUT"
+                exit 1
+              fi
             fi
           else
             # Comportamiento original: crear rama desde develop
