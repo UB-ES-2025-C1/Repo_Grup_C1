@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref,watch } from 'vue'
+import { ref, watch } from 'vue'
 
 // Emite los filtros seleccionados al padre
 const emit = defineEmits(['applyFilters']);

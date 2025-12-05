@@ -2,9 +2,7 @@
 import { mount } from '@vue/test-utils'
 import ForumCard from '@/components/ForumCard.vue'
 
-describe('MovieCard', () => {
-  const BASE_URL = 'http://127.0.0.1:8000'
-
+describe('ForumCard', () => {
   const baseForum = {
     id: '1',
     title: 'title',
