@@ -122,6 +122,7 @@ import defaultAvatar from '@/assets/default-avatar.webp';
 import { withApiBase } from '@/utils/api';
 import axios from 'axios';
 
+
 const emit = defineEmits(['deleted']);
 
 const props = defineProps({
@@ -364,6 +365,12 @@ async function deleteComment() {
 const isReplying = ref(false);
 
 function startReply() {
+  const token = localStorage.getItem('access')
+
+  if (!token) {
+    router.push('/login')
+    return
+  }
   isReplying.value = true;
   replyText.value = `@${displayName.value} `;
 }
@@ -395,6 +402,7 @@ function checkPrefix(e) {
     });
   }
 }
+
 
 
 </script>
