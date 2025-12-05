@@ -867,3 +867,37 @@ class TestForumAPI(APITestCase):
         # data[2] debe ser p3 (el más nuevo)
         self.assertEqual(data[2]['id'], p3.id)
         self.assertEqual(data[2]['text'], "Third Post (Newest)")
+    def test_forums_ordered_by_popularity(self):
+        """
+        Verifica que los foros se devuelven ordenados por el número de posts (mayor a menor).
+        """
+        # 1. Crear Foro "Poco Popular" (Con 1 post)
+        forum_small = Forum.objects.create(title="Small Forum", creator=self.user1)
+        ForumPost.objects.create(forum=forum_small, user=self.user1, text="Only one post")
+
+        # 2. Crear Foro "Muy Popular" (Con 3 posts)
+        forum_big = Forum.objects.create(title="Big Forum", creator=self.user1)
+        ForumPost.objects.create(forum=forum_big, user=self.user1, text="Post 1")
+        ForumPost.objects.create(forum=forum_big, user=self.user1, text="Post 2")
+        ForumPost.objects.create(forum=forum_big, user=self.user1, text="Post 3")
+
+        # 3. Crear Foro "Vacio" (0 posts)
+        forum_empty = Forum.objects.create(title="Empty Forum", creator=self.user1)
+
+        # Hacemos la petición
+        resp = self.client.get(self.forums_url, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        data = resp.data
+        self.assertEqual(len(data), 3)
+
+        # EL ORDEN ESPERADO ES: Big (3) -> Small (1) -> Empty (0)
+        
+        self.assertEqual(data[0]['id'], forum_big.id)      # El primero debe ser el popular
+        self.assertEqual(data[0]['posts_count'], 3)
+
+        self.assertEqual(data[1]['id'], forum_small.id)    # El segundo el mediano
+        self.assertEqual(data[1]['posts_count'], 1)
+
+        self.assertEqual(data[2]['id'], forum_empty.id)    # El último el vacío
+        self.assertEqual(data[2]['posts_count'], 0)
