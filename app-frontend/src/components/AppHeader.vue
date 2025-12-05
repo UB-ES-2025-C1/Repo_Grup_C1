@@ -1,8 +1,12 @@
 <template>
   <header class="header">
-    <router-link to="/" class="brand">
-      <span class="dot"></span> CINEMA UB
-    </router-link>
+    <div class="redirects">
+      <router-link to="/" class="brand">
+        <span class="dot"></span> CINEMA UB
+      </router-link>
+
+      <router-link to="/forums" class="forums">Forums</router-link>
+    </div>
 
     <!-- Two named slots for fine-grained control: `login` and `signup`.
          A full `actions` slot can still override both. -->
@@ -121,6 +125,11 @@ function resolvePhotoSrc(photo) {
   padding: 1rem;
 }
 
+.redirects {
+  display: inline-flex;
+  gap: 2rem;
+}
+
 .brand {
   font-weight: 700;
   display: inline-flex;
@@ -134,6 +143,10 @@ function resolvePhotoSrc(photo) {
   background: #3b82f6;
   border-radius: 50%;
   display: inline-block;
+}
+
+.forums {
+  font-weight: 500;
 }
 
 .actions { display: inline-flex; gap: 0.5rem; }

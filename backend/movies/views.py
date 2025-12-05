@@ -16,6 +16,7 @@ from django.db.models import Count
 from .models import CommentLike
 from .models import Forum, ForumPost
 from .serializers import ForumSerializer, ForumPostSerializer
+from django.db.models import Count 
 
 
 
@@ -387,9 +388,15 @@ class ForumListCreateAPIView(generics.ListCreateAPIView):
     GET: Lista todos los foros (Público).
     POST: Crea un nuevo foro (Solo Logueados).
     """
-    queryset = Forum.objects.all()
     serializer_class = ForumSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        # 1. annotate(num_posts=Count('posts')): Crea un campo temporal 'num_posts'
+        # 2. order_by('-num_posts'): Ordena descendente (el que más tiene va primero)
+        return Forum.objects.annotate(
+            num_posts=Count('posts')
+        ).order_by('-num_posts')
 
     def perform_create(self, serializer):
         serializer.save(creator=self.request.user)
