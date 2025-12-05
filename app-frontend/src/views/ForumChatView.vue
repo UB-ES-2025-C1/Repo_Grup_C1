@@ -121,7 +121,7 @@ async function sendpost() {
 function subscribeToForum() {
   sse = new EventSource(withSseBase('/sse/stream'))
 
-  sse.onpost = (event) => {
+  sse.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data)
       console.log(data)
