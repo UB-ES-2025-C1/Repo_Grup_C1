@@ -22,6 +22,12 @@ const routes = [
     component: () => import('@/views/RateMovie.vue'),
     props: true
   },
+  {
+    path: '/movie/:tconst/:comment/:comment_id',
+    name: 'comment-replies',
+    component: () => import('@/views/CommentReplies.vue'),
+    props: true
+  },
   { path: '/register', name: 'register', component: RegisterView } ,
   { path: '/login', name: 'login', component: LoginView },
   {
