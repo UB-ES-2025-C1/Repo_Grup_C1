@@ -72,8 +72,7 @@ const profileLink = computed(() => {
 
 // Compute avatar src robustly: prefer rating.user.photo when provided by API.
 const avatarSrc = computed(() => {
-  const user = props.rating && props.rating.user;
-  const photo = user && (user.photo || user.photo_url || user.photoUrl);
+  const photo = props.post.user_photo;
   if (!photo) return defaultAvatar;
   // If it's already absolute, use as-is
   if (/^https?:\/\//i.test(photo)) return photo;
@@ -101,6 +100,7 @@ function formatDate(d) {
   border:2px solid rgba(0, 0, 0, 0.5);
   padding: 1rem;
   width: max-content;
+  max-width: 80%;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -143,6 +143,10 @@ function formatDate(d) {
 
 .content {
   font-size: 1.2rem;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .timestamp {

@@ -181,6 +181,9 @@ function unsubscribeFromForum() {
   height: 60vh;
   overflow-y: auto;
   background: #111827;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .input-bar {
