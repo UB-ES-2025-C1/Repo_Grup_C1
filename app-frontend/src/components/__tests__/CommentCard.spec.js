@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import CommentCard from '@/components/CommentCard.vue'
 
+
+
 // Mock axios
 vi.mock('axios', () => ({
   default: {
@@ -279,6 +281,7 @@ describe('CommentCard', () => {
     
     const rating = {
       id: 100,
+      parent_id: 1, // <-- Necesario para ser reply
       comment: 'My comment',
       user: { username: 'alice' },
       like_count: 0,
@@ -320,6 +323,7 @@ describe('CommentCard', () => {
     
     const rating = {
       id: 200,
+      parent_id: 1, // <-- reply
       comment: 'Original text',
       user: { username: 'alice' },
       like_count: 0,
@@ -353,6 +357,7 @@ describe('CommentCard', () => {
     
     const rating = {
       id: 300,
+      parent_id: 1, // <-- reply
       comment: 'Original text',
       user: { username: 'alice' },
       like_count: 0,
@@ -389,6 +394,7 @@ describe('CommentCard', () => {
     
     const rating = {
       id: 400,
+      parent_id: 1,  
       comment: 'Original text',
       user: { username: 'alice' },
       like_count: 0,
@@ -432,6 +438,7 @@ describe('CommentCard', () => {
     
     const rating = {
       id: 500,
+      parent_id: 1,
       comment: 'Text',
       user: { username: 'alice' },
       like_count: 0,
@@ -462,6 +469,7 @@ describe('CommentCard', () => {
     
     const rating = {
       id: 600,
+      parent_id: 1,
       comment: 'Short',
       user: { username: 'alice' },
       like_count: 0,
@@ -493,6 +501,7 @@ describe('CommentCard', () => {
     
     const rating = {
       id: 700,
+      parent_id: 1,
       comment: 'Text',
       user: { username: 'alice' },
       like_count: 0,
@@ -546,5 +555,70 @@ describe('CommentCard', () => {
       {},
       { headers: { Authorization: 'Bearer fake-token' } }
     )
+  })
+
+  it('shows delete button only for comment owner', () => {
+    localStorage.setItem('username', 'alice')
+    const wrapper = mount(CommentCard, {
+      props: {
+        rating: {
+          id: 1,
+          parent_id: 123, // esto hace que isReply=true
+          user: { username: 'alice' },
+          comment: 'Test comment'
+        }
+      }
+    })
+    expect(wrapper.find('.delete-button').exists()).toBe(true)
+  })
+
+  it('does not show delete button for other users comments', () => {
+    localStorage.setItem('username', 'bob') // no es el dueño
+    const wrapper = mount(CommentCard, {
+      props: {
+        rating: {
+          id: 1,
+          parent_id: 123,
+          user: { username: 'alice' },
+          comment: 'Test comment'
+        }
+      }
+    })
+    expect(wrapper.find('.delete-button').exists()).toBe(false)
+  })
+  
+
+  // === Tests for Reply Form ===
+
+  it('shows reply form when reply button is clicked', async () => {
+    localStorage.setItem('username', 'alice')
+    localStorage.setItem('access', 'token')
+    const wrapper = mount(CommentCard, {
+      props: {
+        rating: { id: 1, parent_id: 123, user: { username: 'bob' }, comment: 'Replyable comment' }
+      }
+    })
+
+    await wrapper.find('.reply-button').trigger('click')
+    expect(wrapper.find('.reply-form').exists()).toBe(true)
+  })
+
+  it('does not show reply form for unauthenticated users', async () => {
+    localStorage.removeItem('access')
+
+    const wrapper = mount(CommentCard, {
+      props: {
+        rating: { id: 1, parent_id: 123, user: { username: 'bob' }, comment: 'Replyable comment' }
+      },
+      global: {
+        stubs: { 'router-link': { template: '<a><slot /></a>' } }
+      }
+    })
+
+    await wrapper.find('.reply-button').trigger('click')
+
+    expect(pushMock).toHaveBeenCalledWith('/login')
+
+    expect(wrapper.find('.reply-form').exists()).toBe(false)
   })
 })
