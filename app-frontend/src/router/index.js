@@ -47,6 +47,7 @@ const routes = [
     path: '/forums/:id',
     name: 'forum-chat',
     component: ForumChatView,
+    props: (route) => ({ forumId: Number(route.params.id) }),
     meta: { requiresAuth: true }
   }
 ]

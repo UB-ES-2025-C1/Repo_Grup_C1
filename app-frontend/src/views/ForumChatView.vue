@@ -44,14 +44,17 @@
 <script setup>
 import AppHeader from '@/components/AppHeader.vue'
 import ForumPostCard from '@/components/ForumPostCard.vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import axios from 'axios'
 import { withApiBase } from '@/utils/api'
 import { withSseBase } from '@/utils/sse'
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
 
-const route = useRoute()
-const forumId = route.params.id
+const props = defineProps({
+  forumId: {
+    type: Number,
+    required: true,
+  },
+});
 
 // --- STATE ---
 const forum = ref(null)
@@ -79,10 +82,10 @@ function scrollToBottom() {
 // --- LOAD FORUM ---
 onMounted(async () => {
   try {
-    const resForum = await axios.get(withApiBase(`/movies/forums/${forumId}/`))
+    const resForum = await axios.get(withApiBase(`/movies/forums/${props.forumId}/`))
     forum.value = resForum.data
 
-    const resPosts = await axios.get(withApiBase(`/movies/forums/${forumId}/posts/`))
+    const resPosts = await axios.get(withApiBase(`/movies/forums/${props.forumId}/posts/`))
     posts.value = resPosts.data || []
   } catch (err) {
     error.value = 'Failed to load forum.'
@@ -105,7 +108,7 @@ async function sendpost() {
   sending.value = true
 
   try {
-    await axios.post(withApiBase(`/movies/forums/${forumId}/posts/`), {
+    await axios.post(withApiBase(`/movies/forums/${props.forumId}/posts/`), {
       text: postText.value
     })
 
@@ -130,12 +133,12 @@ function subscribeToForum() {
         clientId = data.client_id
         localStorage.setItem('sse_client_id', clientId)
 
-        axios.post(`${withSseBase('/sse/subscribe')}/forum:${forumId}`, { client_id: clientId })
+        axios.post(`${withSseBase('/sse/subscribe')}/forum:${props.forumId}`, { client_id: clientId })
           .catch(console.warn)
         return
       }
 
-      if (data.type === 'new_forum_post' && data.forum_info.id == forumId) {
+      if (data.type === 'new_forum_post' && data.forum_info.id == props.forumId) {
         posts.value.push(data.forum_post)
         scrollToBottom()
       }
@@ -151,7 +154,7 @@ function subscribeToForum() {
 function unsubscribeFromForum() {
   if (!sse || !clientId) return
 
-  axios.post(`${withSseBase('/sse/unsubscribe')}/forum:${forumId}`, {
+  axios.post(`${withSseBase('/sse/unsubscribe')}/forum:${props.forumId}`, {
     client_id: clientId
   }).catch(console.warn)
 
