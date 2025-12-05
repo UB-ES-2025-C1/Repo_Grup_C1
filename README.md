@@ -155,8 +155,25 @@ La configuración de Cypress se encuentra en `app-frontend/cypress.config.js`:
 - Docker Compose (incluido en Docker Desktop)
 
 ### Inicia el servidor redis
+
+Para crear el docker, ejecuta
+
 ```
 docker run --name redis-sse -p 6379:6379 -d redis
+```
+
+Si ya lo tienes creado y quieres iniciarlo, ejecuta
+
+```
+docker start redis-sse
+```
+
+### Deten el servidor redis
+
+El docker no se parará automaticamente. Para pararlo, ejecuta
+
+```
+docker stop redis-sse
 ```
 
 ## Terminal del servidor SSE

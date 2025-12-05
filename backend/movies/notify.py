@@ -5,7 +5,7 @@ from redis import Redis
 import os
 
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379")
 
 DISABLE_SSE = os.environ.get("DISABLE_SSE", "")
 

@@ -291,7 +291,6 @@ function subscribeToMovie() {
   sse.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log(data);
 
       if (data.type === 'client_id') {
         clientId = data.client_id;

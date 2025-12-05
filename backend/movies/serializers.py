@@ -10,9 +10,6 @@ from rest_framework.exceptions import ValidationError
 from axes.handlers.database import AxesDatabaseHandler
 from .models import Profile
 from .models import Comment
-from .notify import publish_sse
-from django.db.models.signals import post_delete
-from django.dispatch import receiver
 from .models import Forum, ForumPost
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -393,52 +390,9 @@ class RatingSerializer(serializers.ModelSerializer):
                 if attr in validated_data:
                     setattr(existing, attr, validated_data[attr])
             existing.save()
-            rating = existing
+            return existing
         else:
-            rating = Rating.objects.create(movie=movie, user=user, **validated_data)
-
-        movie_serializer = MovieSerializer(movie)
-
-        # Send SSE notification
-        channel = f'movie:{movie.tconst}'
-        event = {
-            'type': 'new_rating',
-            'rating': {
-                'id': rating.id,
-                'movie_info': MovieMiniSerializer(rating.movie).data,
-                'user': self.get_user(rating),
-                'overall_score': rating.overall_score,
-                'soundtrack': rating.soundtrack,
-                'acting': rating.acting,
-                'cinematography': rating.cinematography,
-                'plot': rating.plot,
-                'date': str(rating.date),
-            },
-            'new_movie': movie_serializer.data,
-        }
-        publish_sse(channel, event)
-
-        return rating
-    
-    @receiver(post_delete, sender=Rating)
-    def rating_deleted(sender, instance, **kwargs):
-        movie_serializer = MovieSerializer(instance.movie)
-
-        # Send SSE notification
-        channel = f'movie:{instance.movie.tconst}'
-        event = {
-            'type': 'deleted_rating',
-            'rating': {
-                'id': instance.id,
-                'movie_info': { 'tconst': instance.movie.tconst },
-                'user': {
-                    'id': instance.user.id,
-                    'username': instance.user.username
-                }
-            },
-            'new_movie': movie_serializer.data,
-        }
-        publish_sse(channel, event)
+            return Rating.objects.create(movie=movie, user=user, **validated_data)
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
