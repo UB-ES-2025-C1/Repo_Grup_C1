@@ -16,6 +16,7 @@ from django.db.models import Count
 from .models import CommentLike
 from .models import Forum, ForumPost
 from .serializers import ForumSerializer, ForumPostSerializer
+from django.db.models import Count 
 
 
 
@@ -222,14 +223,15 @@ def get_all_users(request):
 
 class MovieCommentsListAPIView(generics.ListAPIView):
     """
-    Lista los comentarios RAÍZ.
-    ORDEN: Primero los que tienen más likes, luego los más recientes.
+    Lista los comentarios RAÍZ de una película.
+    NO incluye las respuestas anidadas, solo el número de respuestas (reply_count).
     """
     serializer_class = CommentSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         tconst = self.kwargs.get('tconst')
+        # Filtramos solo los padres y ANOTAMOS (contamos) sus respuestas
         return Comment.objects.filter(
             movie__tconst=tconst, 
             parent__isnull=True
@@ -241,14 +243,14 @@ class MovieCommentsListAPIView(generics.ListAPIView):
 
 class CommentRepliesListAPIView(generics.ListAPIView):
     """
-    Lista las respuestas.
-    ORDEN: Cronológico (Ascendente), los likes no afectan al orden aquí.
+    Devuelve solo las respuestas de un comentario específico.
     """
     serializer_class = CommentSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         comment_id = self.kwargs.get('comment_id')
+        # Obtenemos comentarios cuyo padre sea el ID pasado en la URL
         return Comment.objects.filter(
             parent__id=comment_id
         ).select_related('user', 'user__profile').prefetch_related('likes').annotate(
@@ -386,9 +388,15 @@ class ForumListCreateAPIView(generics.ListCreateAPIView):
     GET: Lista todos los foros (Público).
     POST: Crea un nuevo foro (Solo Logueados).
     """
-    queryset = Forum.objects.all()
     serializer_class = ForumSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        # 1. annotate(num_posts=Count('posts')): Crea un campo temporal 'num_posts'
+        # 2. order_by('-num_posts'): Ordena descendente (el que más tiene va primero)
+        return Forum.objects.annotate(
+            num_posts=Count('posts')
+        ).order_by('-num_posts')
 
     def perform_create(self, serializer):
         serializer.save(creator=self.request.user)

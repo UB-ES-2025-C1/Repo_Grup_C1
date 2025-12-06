@@ -23,7 +23,7 @@ STREAM_PATH = f"{SSE_PREFIX}/stream"
 SUBSCRIBE_PATH = f"{SSE_PREFIX}/subscribe"
 UNSUBSCRIBE_PATH = f"{SSE_PREFIX}/unsubscribe"
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 # ------------------------------
 # Estado del servidor
