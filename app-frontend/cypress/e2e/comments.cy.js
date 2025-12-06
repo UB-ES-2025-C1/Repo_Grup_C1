@@ -178,9 +178,11 @@ describe('Comments - funcionalidad de comentarios', () => {
     cy.contains('Other reviews').should('be.visible')
     cy.get('.comments-list .user-rating-card').first().should('contain', 'Comentario con muchos likes')
     
-    // Entre los que tienen 0 likes, el más reciente debe aparecer primero
-    cy.get('.comments-list .user-rating-card').eq(1).should('contain', 'Comentario reciente sin likes')
-    cy.get('.comments-list .user-rating-card').eq(2).should('contain', 'Comentario con pocos likes')
+    // El segundo debe ser el de 1 like (ordenados por likes primero)
+    cy.get('.comments-list .user-rating-card').eq(1).should('contain', 'Comentario con pocos likes')
+    
+    // El tercero debe ser el de 0 likes (entre los de 0 likes, el más reciente primero)
+    cy.get('.comments-list .user-rating-card').eq(2).should('contain', 'Comentario reciente sin likes')
   })
 
   it('muestra el comentario del usuario registrado primero si ha hecho uno', () => {
@@ -693,6 +695,12 @@ describe('Comments - funcionalidad de comentarios', () => {
       body: [rating],
     }).as('getRatings')
 
+    // Mock para evitar el 401 cuando MovieInfo intenta obtener el rating del usuario
+    cy.intercept('GET', `**/movies/ratings/${movie.tconst}/`, {
+      statusCode: 404,
+      body: {},
+    }).as('getUserRating')
+
     cy.intercept('GET', '**/movies/profiles/me/', {
       statusCode: 200,
       body: {
@@ -758,6 +766,12 @@ describe('Comments - funcionalidad de comentarios', () => {
       statusCode: 200,
       body: [rating],
     }).as('getRatings')
+
+    // Mock para evitar el 401 cuando MovieInfo intenta obtener el rating del usuario
+    cy.intercept('GET', `**/movies/ratings/${movie.tconst}/`, {
+      statusCode: 404,
+      body: {},
+    }).as('getUserRating')
 
     // Mock para cuando se elimina el like
     cy.intercept('POST', `**/movies/comments/1/like/`, {
