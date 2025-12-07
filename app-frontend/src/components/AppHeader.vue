@@ -1,8 +1,12 @@
 <template>
   <header class="header">
-    <router-link to="/" class="brand">
-      <span class="dot"></span> CINEMA UB
-    </router-link>
+    <div class="redirects">
+      <router-link to="/" class="brand">
+        <span class="dot"></span> CINEMA UB
+      </router-link>
+
+      <router-link to="/forums" class="forums">Forums</router-link>
+    </div>
 
     <!-- Two named slots for fine-grained control: `login` and `signup`.
          A full `actions` slot can still override both. -->
@@ -16,7 +20,7 @@
           </slot>
           <router-link to="/profile"><button class="profile-btn">
             <span>{{ username }}</span>
-            <img :src="avatarUrl || defaultAvatar" alt="Avatar" class="avatar" />
+            <img :src="avatarUrl && avatarUrl !== '' ? avatarUrl : defaultAvatar" alt="Avatar" class="avatar" />
           </button></router-link>
         </template>
 
@@ -55,19 +59,22 @@ try {
 onMounted(async () => {
   if (isLoggedIn.value) {
     username.value = localStorage.getItem('username');
-    avatarUrl.value = resolvePhotoSrc(localStorage.getItem('avatarUrl'));
+    const storedPhotoPath = localStorage.getItem('avatarUrl');
+    avatarUrl.value = resolvePhotoSrc(storedPhotoPath);
 
-    if (!username.value || !avatarUrl.value) {
+    if (!username.value || !storedPhotoPath) {
       try {
         console.log(withApiBase('/movies/profiles/me/'));
         const response = await axios.get(withApiBase('/movies/profiles/me/'));
         
         const data = response.data;
         username.value = data.username;
-        avatarUrl.value = resolvePhotoSrc(data.photo);
         
+        // Store the raw photo path, resolve it when displaying
+        const photoPath = data.photo || '';
         localStorage.setItem('username', username.value);
-        localStorage.setItem('avatarUrl', data.photo);
+        localStorage.setItem('avatarUrl', photoPath);
+        avatarUrl.value = resolvePhotoSrc(photoPath);
       } catch (e) {
         console.error('Error loading user info', e);
       }
@@ -80,9 +87,15 @@ const onProfileUpdated = (ev) => {
   try {
     const photo = ev && ev.detail && ev.detail.photo_url;
     const name = ev && ev.detail && ev.detail.username;
-    avatarUrl.value = resolvePhotoSrc(photo);
-    localStorage.setItem('avatarUrl', photo || defaultAvatar);
-    if (name) username.value = name;
+    
+    // Store the raw path and resolve for display
+    if (photo) {
+      localStorage.setItem('avatarUrl', photo);
+      avatarUrl.value = resolvePhotoSrc(photo);
+    }
+    if (name) {
+      username.value = name;
+    }
   } catch (e) {
     // ignore
   }
@@ -93,7 +106,7 @@ onUnmounted(() => window.removeEventListener('profile-updated', onProfileUpdated
 
 // Compute avatar src robustly: prefer rating.user.photo when provided by API.
 function resolvePhotoSrc(photo) {
-  if (!photo) return defaultAvatar;
+  if (!photo || photo === '' || photo === 'null' || photo === 'undefined') return defaultAvatar;
   // If it's already absolute, use as-is
   if (/^https?:\/\//i.test(photo)) return photo;
   // If it starts with '/', assume it's a path served by the API (use withApiBase to make full URL)
@@ -112,6 +125,11 @@ function resolvePhotoSrc(photo) {
   padding: 1rem;
 }
 
+.redirects {
+  display: inline-flex;
+  gap: 2rem;
+}
+
 .brand {
   font-weight: 700;
   display: inline-flex;
@@ -125,6 +143,10 @@ function resolvePhotoSrc(photo) {
   background: #3b82f6;
   border-radius: 50%;
   display: inline-block;
+}
+
+.forums {
+  font-weight: 500;
 }
 
 .actions { display: inline-flex; gap: 0.5rem; }
