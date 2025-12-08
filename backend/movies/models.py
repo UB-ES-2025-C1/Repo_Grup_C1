@@ -170,7 +170,7 @@ class Profile(models.Model):
 class Comment(models.Model):
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='comments')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    text = models.TextField()
+    text = models.TextField(blank=True, default='')
     
     # Si es null, es un comentario raíz (opinión de la peli).
     # Si tiene valor, es una respuesta a otro comentario.

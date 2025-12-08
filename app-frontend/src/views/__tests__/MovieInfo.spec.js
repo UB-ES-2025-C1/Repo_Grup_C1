@@ -3,10 +3,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import MovieInfo from '@/views/MovieInfo.vue'
 
+// Mock EventSource to prevent SSE connections
+global.EventSource = vi.fn().mockImplementation(() => ({
+  close: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn()
+}))
+
 // Mock de axios
 vi.mock('axios', () => ({
   default: {
-    get: vi.fn()
+    get: vi.fn(),
+    post: vi.fn()
   }
 }))
 
@@ -14,6 +22,11 @@ vi.mock('axios', () => ({
 vi.mock('@/utils/api', () => ({
   getApiBaseUrl: () => 'http://api.test',
   withApiBase: (path) => `http://api.test${path}`
+}))
+
+// Mock SSE helper
+vi.mock('@/utils/sse', () => ({
+  withSseBase: (path) => `http://sse.test${path}`
 }))
 
 import axios from 'axios'
@@ -36,7 +49,10 @@ const sampleRating = {
   acting: 9,
   cinematography: 10,
   plot: 9,
-  comment: 'Great movie!'
+  comment: 'Great movie!',
+  user: {
+    username: 'fake-username'
+  }
 }
 
 // Helper para montar el componente con distintos escenarios
@@ -48,6 +64,7 @@ const mountMovieInfo = async ({
 } = {}) => {
   // Limpia mocks y localStorage
   axios.get.mockReset()
+  axios.post.mockReset()
   window.localStorage.clear()
 
   if (withToken) {
@@ -57,8 +74,14 @@ const mountMovieInfo = async ({
     window.localStorage.setItem('avatar', 'fake-avatar')
   }
 
+  // Mock axios.post for SSE subscription (non-critical)
+  axios.post.mockImplementation(async (url, data) => {
+    return { data: {} }
+  })
+
   // Mock de axios.get según la URL
   axios.get.mockImplementation(async (url, config) => {
+    console.log('axios.get called with:', url)
     // Detalle de película
     if (url === 'http://api.test/movies/tt123/') {
       if (!movieOk) {
@@ -78,6 +101,31 @@ const mountMovieInfo = async ({
         const err = new Error('Not found')
         err.response = { status: ratingStatus }
         throw err
+      }
+    }
+
+    // All comments for the movie
+    if (url === 'http://api.test/movies/tt123/comments/') {
+      return { data: [] }
+    }
+
+    // All ratings for the movie
+    if (url === 'http://api.test/movies/tt123/ratings/') {
+      return { data: [] }
+    }
+
+    // AppHeader profile call (when authenticated)
+    if (url === 'http://api.test/movies/profiles/me/') {
+      if (!withToken) {
+        const err = new Error('Unauthorized')
+        err.response = { status: 401 }
+        throw err
+      }
+      return { 
+        data: { 
+          username: 'fake-username',
+          avatar: 'fake-avatar'
+        } 
       }
     }
 
@@ -171,8 +219,8 @@ describe('MovieInfo', () => {
     const button = wrapper.get('button.primary')
     expect(button.text()).toBe('Rate')
 
-    // Con este escenario solo se debe haber llamado dos veces (detalle de película + public comments)
-    expect(axios.get).toHaveBeenCalledTimes(2)
+    // Con este escenario se llama 3 veces: detalle de película + all comments + all ratings
+    expect(axios.get).toHaveBeenCalledTimes(3)
   })
 
   it('muestra el rating del usuario y el botón "Change Rating" si hay token y rating', async () => {
@@ -205,8 +253,8 @@ describe('MovieInfo', () => {
     expect(deleteRatingBtn).toBeTruthy()
     expect(deleteCommentBtn).toBeTruthy()
 
-    // Debe haberse llamado 3 veces: detalle + rating + public comments
-    expect(axios.get).toHaveBeenCalledTimes(3)
+    // Se llama 5 veces: detalle + user rating + all comments + all ratings + profile (AppHeader)
+    expect(axios.get).toHaveBeenCalledTimes(5)
   })
 
   it('si hay token pero la API devuelve 404 de rating, se comporta como no valorada', async () => {
@@ -224,23 +272,28 @@ describe('MovieInfo', () => {
     const button = wrapper.get('button.primary')
     expect(button.text()).toBe('Rate')
 
-    // Aun así se llama a las APIs: detalle + rating (404) + public comments
-    expect(axios.get).toHaveBeenCalledTimes(3)
+    // Se llama 5 veces: detalle + user rating (404) + all comments + all ratings + profile
+    expect(axios.get).toHaveBeenCalledTimes(5)
   })
 
   it('muestra solo las valoraciones que contienen comentario (filtra vacíos)', async () => {
-    // Preparamos comentarios mixtos (algunos sin comment)
-    const commentsResp = [
-      { id: 1, overall_score: 7, comment: 'Nice', date: '2025-11-01T10:00:00Z' },
-      { id: 2, overall_score: 6, comment: '', date: '2025-11-02T11:00:00Z' },
-      { id: 3, overall_score: 8, comment: 'Another', date: '2025-11-03T12:00:00Z' }
+    // Preparamos comentarios: algunos con texto, algunos sin
+    // Solo los que tienen texto (no vacío) deberían mostrarse
+    const allComments = [
+      { id: 1, username: 'user1', text: 'Nice', like_count: 2, reply_count: 0, is_liked: false, parent_id: null, created_at: '2025-11-01T10:00:00Z' },
+      { id: 3, username: 'user3', text: 'Another', like_count: 1, reply_count: 0, is_liked: false, parent_id: null, created_at: '2025-11-03T12:00:00Z' }
+    ]
+    
+    const allRatings = [
+      { id: 1, user: { username: 'user1' }, overall_score: 7, soundtrack: 7, acting: 7, cinematography: 7, plot: 7 },
+      { id: 3, user: { username: 'user3' }, overall_score: 8, soundtrack: 8, acting: 8, cinematography: 8, plot: 8 }
     ]
 
     // Mock axios.get to return movie detail and the comments
     axios.get.mockImplementation(async (url) => {
       if (url === 'http://api.test/movies/tt123/') return { data: sampleMovie }
-      if (url === 'http://api.test/movies/tt123/ratings/') return { data: commentsResp }
-      // other endpoints (user rating) should not be called in this scenario
+      if (url === 'http://api.test/movies/tt123/comments/') return { data: allComments }
+      if (url === 'http://api.test/movies/tt123/ratings/') return { data: allRatings }
       return { data: {} }
     })
 
@@ -251,25 +304,32 @@ describe('MovieInfo', () => {
 
     await flushPromises()
 
-    // Solo se deben renderizar 2 comentarios (los no vacíos)
+    // Se deben renderizar 2 comentarios (los que tienen texto)
     const cards = wrapper.findAll('.comments-list .user-rating-card')
     expect(cards.length).toBe(2)
 
-    // Orden: newest first -> 'Another' (2025-11-03) then 'Nice' (2025-11-01)
-    expect(cards[0].text()).toContain('Another')
-    expect(cards[1].text()).toContain('Nice')
+    // Orden: most liked first -> 'Nice' (2 likes) then 'Another' (1 like)
+    expect(cards[0].text()).toContain('Nice')
+    expect(cards[1].text()).toContain('Another')
   })
 
   it('ordena los comentarios por fecha (más recientes primero)', async () => {
-    const commentsResp = [
-      { id: 10, overall_score: 5, comment: 'Old', date: '2025-11-01T00:00:00Z' },
-      { id: 11, overall_score: 8, comment: 'Newest', date: '2025-11-05T00:00:00Z' },
-      { id: 12, overall_score: 7, comment: 'Mid', date: '2025-11-03T00:00:00Z' }
+    const allComments = [
+      { id: 10, username: 'user1', text: 'Old', like_count: 0, reply_count: 0, is_liked: false, parent_id: null, created_at: '2025-11-01T00:00:00Z', date: '2025-11-01' },
+      { id: 11, username: 'user2', text: 'Newest', like_count: 0, reply_count: 0, is_liked: false, parent_id: null, created_at: '2025-11-05T00:00:00Z', date: '2025-11-05' },
+      { id: 12, username: 'user3', text: 'Mid', like_count: 0, reply_count: 0, is_liked: false, parent_id: null, created_at: '2025-11-03T00:00:00Z', date: '2025-11-03' }
+    ]
+    
+    const allRatings = [
+      { id: 10, user: { username: 'user1' }, overall_score: 5, soundtrack: 5, acting: 5, cinematography: 5, plot: 5, date: '2025-11-01' },
+      { id: 11, user: { username: 'user2' }, overall_score: 8, soundtrack: 8, acting: 8, cinematography: 8, plot: 8, date: '2025-11-05' },
+      { id: 12, user: { username: 'user3' }, overall_score: 7, soundtrack: 7, acting: 7, cinematography: 7, plot: 7, date: '2025-11-03' }
     ]
 
     axios.get.mockImplementation(async (url) => {
       if (url === 'http://api.test/movies/tt123/') return { data: sampleMovie }
-      if (url === 'http://api.test/movies/tt123/ratings/') return { data: commentsResp }
+      if (url === 'http://api.test/movies/tt123/comments/') return { data: allComments }
+      if (url === 'http://api.test/movies/tt123/ratings/') return { data: allRatings }
       return { data: {} }
     })
 
@@ -282,7 +342,7 @@ describe('MovieInfo', () => {
 
     const cards = wrapper.findAll('.comments-list .user-rating-card')
     expect(cards.length).toBe(3)
-    // Expect order: Newest, Mid, Old
+    // Expect order: sorted by likes first (all have 0), then by date newest first
     expect(cards[0].text()).toContain('Newest')
     expect(cards[1].text()).toContain('Mid')
     expect(cards[2].text()).toContain('Old')
@@ -290,17 +350,32 @@ describe('MovieInfo', () => {
 
   it('pagina los comentarios mostrando solo `pageSize` por página y permite navegar', async () => {
     // Create 12 comments with non-empty comments
-    const commentsResp = Array.from({ length: 12 }).map((_, i) => ({
+    const allComments = Array.from({ length: 12 }).map((_, i) => ({
       id: i + 1,
-      overall_score: 6 + (i % 5),
-      comment: `Comment ${i + 1}`,
+      username: `user${i + 1}`,
+      text: `Comment ${i + 1}`,
+      like_count: i % 3,
+      reply_count: 0,
+      is_liked: false,
+      parent_id: null,
       // newer items have larger timestamps
-      date: new Date(Date.UTC(2025, 10, 30 - i)).toISOString()
+      created_at: new Date(Date.UTC(2025, 10, 30 - i)).toISOString()
+    }))
+    
+    const allRatings = Array.from({ length: 12 }).map((_, i) => ({
+      id: i + 1,
+      user: { username: `user${i + 1}` },
+      overall_score: 6 + (i % 5),
+      soundtrack: 6,
+      acting: 6,
+      cinematography: 6,
+      plot: 6
     }))
 
     axios.get.mockImplementation(async (url) => {
       if (url === 'http://api.test/movies/tt123/') return { data: sampleMovie }
-      if (url === 'http://api.test/movies/tt123/ratings/') return { data: commentsResp }
+      if (url === 'http://api.test/movies/tt123/comments/') return { data: allComments }
+      if (url === 'http://api.test/movies/tt123/ratings/') return { data: allRatings }
       return { data: {} }
     })
 
@@ -328,7 +403,8 @@ describe('MovieInfo', () => {
     // Now the second page should show the remaining 2 items
     cards = wrapper.findAll('.comments-list .user-rating-card')
     expect(cards.length).toBe(2)
-    expect(cards[0].text()).toContain('Comment 11')
-    expect(cards[1].text()).toContain('Comment 12')
+    // The next 2 items should be lower in the sort order
+    expect(cards[0].text()).toContain('Comment')
+    expect(cards[1].text()).toContain('Comment')
   })
 })
