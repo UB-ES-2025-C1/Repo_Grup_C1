@@ -70,7 +70,7 @@ const allForums = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const page = ref(1);
-const pageSize = ref(10);
+const pageSize = ref(12);
 const searchQuery = ref('');
 const selectedFilters = ref({
   searchQuery: '',
