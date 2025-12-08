@@ -94,7 +94,7 @@ describe('ForumHomeView', () => {
 
     // Page 1 → 10 elementos
     expect(wrapper.vm.page).toBe(1)
-    expect(wrapper.findAllComponents({ name: 'ForumCard' }).length).toBe(10)
+    expect(wrapper.findAllComponents({ name: 'ForumCard' }).length).toBe(12)
 
     // Helper para buscar por texto
     const getButton = (text) =>
@@ -103,12 +103,12 @@ describe('ForumHomeView', () => {
     // Next page
     await getButton('Next').trigger('click')
     expect(wrapper.vm.page).toBe(2)
-    expect(wrapper.findAllComponents({ name: 'ForumCard' }).length).toBe(10)
+    expect(wrapper.findAllComponents({ name: 'ForumCard' }).length).toBe(12)
 
     // Next page
     await getButton('Next').trigger('click')
     expect(wrapper.vm.page).toBe(3)
-    expect(wrapper.findAllComponents({ name: 'ForumCard' }).length).toBe(5)
+    expect(wrapper.findAllComponents({ name: 'ForumCard' }).length).toBe(1)
 
     // Prev page
     await getButton('Prev').trigger('click')
