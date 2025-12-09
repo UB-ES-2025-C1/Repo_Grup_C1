@@ -2,8 +2,8 @@
 from django.db.models.signals import post_save, post_delete
 from django.contrib.auth.models import User
 from django.dispatch import receiver
-from .models import Profile, Rating, ForumPost
-from .serializers import MovieSerializer, MovieMiniSerializer, ForumSerializer, ForumPostSerializer
+from .models import Profile, Rating, ForumPost, Comment
+from .serializers import MovieSerializer, MovieMiniSerializer, ForumSerializer, ForumPostSerializer, CommentSerializer
 from .notify import publish_sse
 
 @receiver(post_save, sender=User)
@@ -74,6 +74,54 @@ def rating_deleted(sender, instance, **kwargs):
             }
         },
         'new_movie': movie_serializer.data,
+    }
+    publish_sse(channel, event)
+
+
+@receiver(post_save, sender=Comment)
+def comment_created(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    movie = instance.movie
+    user = instance.user
+
+    if not movie or not user:
+        return
+
+    comment_serializer = CommentSerializer(instance)
+    movie_serializer = MovieMiniSerializer(movie)
+    
+    channel = f'movie:{movie.tconst}'
+    event = {
+        'type': 'new_comment',
+        'movie_info': movie_serializer.data,
+        'comment': comment_serializer.data,
+    }
+    publish_sse(channel, event)
+
+
+@receiver(post_delete, sender=Comment)
+def comment_deleted(sender, instance, **kwargs):
+    movie = instance.movie
+    user = instance.user
+
+    if not movie or not user:
+        return
+    
+    movie_serializer = MovieMiniSerializer(movie)
+    
+    channel = f'movie:{movie.tconst}'
+    event = {
+        'type': 'deleted_comment',
+        'movie_info': movie_serializer.data,
+        'comment': {
+            'id': instance.id,
+            'user': {
+                'id': user.id,
+                'username': user.username
+            }
+        },
     }
     publish_sse(channel, event)
 

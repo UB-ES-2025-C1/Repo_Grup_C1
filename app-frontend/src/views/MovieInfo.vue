@@ -419,6 +419,20 @@ function subscribeToMovie() {
           const index = commentsAll.value.findIndex(r => r.id === data.rating.id);
           if (index !== -1) commentsAll.value.splice(index, 1);
         }
+
+        if (data.type === 'new_comment' && data.movie_info?.tconst === tconst) {
+          const index = commentsAll.value.findIndex(r => r.id === data.comment?.id);
+          if (index === -1 && data.comment) commentsAll.value.unshift(data.comment);  //  New comment
+          if (index !== -1 && data.comment) {  // Comment modified but not removed
+            commentsAll.value.splice(index, 1);
+            commentsAll.value.unshift(data.comment);
+          }
+        }
+
+        if (data.type === 'deleted_comment' && data.movie_info?.tconst === tconst) {
+          const index = commentsAll.value.findIndex(r => r.id === data.comment?.id);
+          if (index !== -1) commentsAll.value.splice(index, 1);
+        }
       } catch (err) {
         console.error('SSE message parse error', err);
       }
