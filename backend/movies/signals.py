@@ -3,7 +3,7 @@ from django.db.models.signals import post_save, post_delete
 from django.contrib.auth.models import User
 from django.dispatch import receiver
 from .models import Profile, Rating, ForumPost
-from .serializers import MovieSerializer, MovieMiniSerializer, ForumSerializer
+from .serializers import MovieSerializer, MovieMiniSerializer, ForumSerializer, ForumPostSerializer
 from .notify import publish_sse
 
 @receiver(post_save, sender=User)
@@ -89,19 +89,13 @@ def post_created(sender, instance, created, **kwargs):
     if not forum or not user:
         return
 
+    post_serializer = ForumPostSerializer(instance)
     forum_serializer = ForumSerializer(forum)
 
     channel = f'forum:{instance.forum.id}'
     event = {
         'type': 'new_forum_post',
-        'forum_post': {
-            'id': instance.id,
-            'username': user.username,
-            'user_photo': getattr(user.profile, 'photo', None).url if hasattr(user, 'profile') and user.profile.photo else None,
-            'text': instance.text,
-            'created_at': instance.created_at,
-            'updated_at': instance.updated_at,
-        },
+        'forum_post': post_serializer.data,
         'forum_info': forum_serializer.data,
     }
     publish_sse(channel, event)
