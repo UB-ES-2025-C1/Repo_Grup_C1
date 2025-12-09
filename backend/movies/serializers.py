@@ -251,6 +251,8 @@ class CommentSerializer(serializers.ModelSerializer):
     user_photo = serializers.SerializerMethodField()
     
     reply_count = serializers.IntegerField(read_only=True)
+    like_count = serializers.IntegerField(read_only=True)
+    is_liked = serializers.SerializerMethodField()
 
     parent_id = serializers.PrimaryKeyRelatedField(
         queryset=Comment.objects.all(), source='parent', required=False, allow_null=True
@@ -265,9 +267,9 @@ class CommentSerializer(serializers.ModelSerializer):
             'id', 'username', 'user_photo', 'text', 
             'created_at', 'updated_at', 
             'movie_tconst', 'parent_id', 
-            'reply_count' 
+            'reply_count', 'like_count', 'is_liked'
         ]
-        read_only_fields = ['id', 'username', 'user_photo', 'created_at', 'updated_at', 'reply_count']
+        read_only_fields = ['id', 'username', 'user_photo', 'created_at', 'updated_at', 'reply_count', 'like_count', 'is_liked']
     
     def validate_parent_id(self, value):
         """
