@@ -1,6 +1,7 @@
 # backend/movies/notify.py
 
 import json
+import logging
 from redis import Redis
 import os
 
