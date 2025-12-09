@@ -99,6 +99,8 @@ def post_created(sender, instance, created, **kwargs):
             'username': user.username,
             'user_photo': getattr(user.profile, 'photo', None).url if hasattr(user, 'profile') and user.profile.photo else None,
             'text': instance.text,
+            'created_at': instance.created_at,
+            'updated_at': instance.updated_at,
         },
         'forum_info': forum_serializer.data,
     }
