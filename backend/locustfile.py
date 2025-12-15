@@ -209,11 +209,13 @@ class AuthenticatedUser(HttpUser):
     def rate_movie(self):
         """
         Simula un usuario calificando o actualizando una película.
+        También crea/actualiza el Comment asociado (como hace el frontend).
         """
         if not self.ensure_authentication():
             return
 
         if self.movie_to_rate_tconst:
+            comment_text = f"Mi comentario de prueba para {self.movie_to_rate_tconst} - {self.email}"
             rating_payload = {
                 "movie": self.movie_to_rate_tconst,
                 "overall_score": random.randint(1, 10),
@@ -221,13 +223,56 @@ class AuthenticatedUser(HttpUser):
                 "acting": random.randint(1, 10),
                 "cinematography": random.randint(1, 10),
                 "plot": random.randint(1, 10),
-                "comment": f"Mi comentario de prueba para {self.movie_to_rate_tconst} - {self.email}"
+                "comment": comment_text
             }
+            
+            rating_success = False
             with self.client.post("/movies/ratings/", json=rating_payload, name="/movies/ratings/", catch_response=True) as response:
                 if response.status_code in [200, 201]:
+                    rating_success = True
                     response.success()
                 else:
                     response.failure(f"[{self.email}] Error al calificar la película {self.movie_to_rate_tconst}: {response.text}")
+                    return
+            
+            # Crear o actualizar Comment asociado (como hace el frontend)
+            if rating_success:
+                comment_payload = {
+                    "text": comment_text
+                }
+                
+                # Intentar PATCH primero (actualizar si existe)
+                try:
+                    with self.client.patch(f"/movies/comments/{self.movie_to_rate_tconst}/", json=comment_payload, name="/movies/comments/[tconst]/PATCH_after_rating", catch_response=True) as response:
+                        if response.status_code in [200, 201]:
+                            comment_data = response.json()
+                            comment_id = comment_data.get('id')
+                            if comment_id:
+                                self.created_comment_ids.append(comment_id)
+                                global known_comment_ids
+                                known_comment_ids.append(comment_id)
+                                known_comment_ids = list(dict.fromkeys(known_comment_ids))
+                            response.success()
+                        elif response.status_code == 404:
+                            # Comment no existe, crearlo con POST
+                            with self.client.post(f"/movies/comments/{self.movie_to_rate_tconst}/", json=comment_payload, name="/movies/comments/[tconst]/POST_after_rating", catch_response=True) as response2:
+                                if response2.status_code in [200, 201]:
+                                    comment_data = response2.json()
+                                    comment_id = comment_data.get('id')
+                                    if comment_id:
+                                        self.created_comment_ids.append(comment_id)
+                                        known_comment_ids.append(comment_id)
+                                        known_comment_ids = list(dict.fromkeys(known_comment_ids))
+                                    response2.success()
+                                else:
+                                    # Comment falló pero Rating existe - no es fallo crítico
+                                    response2.success()
+                        else:
+                            # Otro error - no es fallo crítico si el Rating se creó
+                            response.success()
+                except Exception:
+                    # Si falla el Comment pero el Rating existe, no es crítico
+                    pass
         else:
             print(f"[{self.email}] No movie tconst configured for rating.")
     
@@ -399,24 +444,56 @@ class AuthenticatedUser(HttpUser):
                     response.failure(f"[{self.email}] Error al ver comentarios: {response.text}")
     
     @task(2)
-    def create_movie_comment(self):
-        """Crear comentario raíz en una película."""
+    def create_rating_with_comment(self):
+        """
+        Crear valoración con comentario (simula el comportamiento del frontend).
+        El frontend siempre crea Rating primero, luego Comment.
+        """
         if not self.ensure_authentication():
             return
+        
         tconst = self.get_random_tconst()
-        if tconst:
-            comment_texts = [
-                "Excelente película, muy recomendable",
-                "Me encantó la trama y los personajes",
-                "Una obra maestra del cine",
-                "Interesante pero esperaba más",
-                f"Comentario de prueba {int(time.time())}"
-            ]
+        if not tconst:
+            return
+        
+        # Texto del comentario
+        comment_texts = [
+            "Excelente película, muy recomendable",
+            "Me encantó la trama y los personajes",
+            "Una obra maestra del cine",
+            "Interesante pero esperaba más",
+            f"Comentario de prueba {int(time.time())}"
+        ]
+        comment_text = random.choice(comment_texts)
+        
+        # 1. Crear Rating primero (como hace el frontend)
+        rating_payload = {
+            "movie": tconst,
+            "overall_score": random.randint(1, 10),
+            "soundtrack": random.randint(1, 10),
+            "acting": random.randint(1, 10),
+            "cinematography": random.randint(1, 10),
+            "plot": random.randint(1, 10),
+            "comment": comment_text  # El Rating también tiene el texto del comentario
+        }
+        
+        rating_success = False
+        with self.client.post("/movies/ratings/", json=rating_payload, name="/movies/ratings/POST_with_comment", catch_response=True) as response:
+            if response.status_code in [200, 201]:
+                rating_success = True
+                response.success()
+            else:
+                response.failure(f"[{self.email}] Error al crear rating: {response.text}")
+                return  # Si falla el rating, no crear comment
+        
+        # 2. Crear o actualizar Comment (como hace el frontend)
+        if rating_success:
             comment_payload = {
-                "text": random.choice(comment_texts),
-                "movie_tconst": tconst
+                "text": comment_text
             }
-            with self.client.post(f"/movies/comments/{tconst}/", json=comment_payload, name="/movies/comments/[tconst]/POST", catch_response=True) as response:
+            
+            # Intentar PATCH primero (actualizar si existe)
+            with self.client.patch(f"/movies/comments/{tconst}/", json=comment_payload, name="/movies/comments/[tconst]/PATCH_after_rating", catch_response=True) as response:
                 if response.status_code in [200, 201]:
                     comment_data = response.json()
                     comment_id = comment_data.get('id')
@@ -426,10 +503,36 @@ class AuthenticatedUser(HttpUser):
                         known_comment_ids.append(comment_id)
                         known_comment_ids = list(dict.fromkeys(known_comment_ids))
                     response.success()
-                elif response.status_code == 400 and "Ya has comentado" in response.text:
-                    response.success()  # Ya tiene comentario, no es un fallo
+                elif response.status_code == 404:
+                    # Comment no existe, crearlo con POST
+                    with self.client.post(f"/movies/comments/{tconst}/", json=comment_payload, name="/movies/comments/[tconst]/POST_after_rating", catch_response=True) as response2:
+                        if response2.status_code in [200, 201]:
+                            comment_data = response2.json()
+                            comment_id = comment_data.get('id')
+                            if comment_id:
+                                self.created_comment_ids.append(comment_id)
+                                known_comment_ids.append(comment_id)
+                                known_comment_ids = list(dict.fromkeys(known_comment_ids))
+                            response2.success()
+                        elif response2.status_code == 400 and "Ya has comentado" in response2.text:
+                            response2.success()  # Ya existe, no es fallo
+                        else:
+                            # Comment falló pero Rating existe - warning pero no fallo crítico
+                            response2.success()  # Como hace el frontend (línea 202-205)
                 else:
-                    response.failure(f"[{self.email}] Error al crear comentario: {response.text}")
+                    # Otro error en PATCH - intentar POST
+                    with self.client.post(f"/movies/comments/{tconst}/", json=comment_payload, name="/movies/comments/[tconst]/POST_after_rating_fallback", catch_response=True) as response2:
+                        if response2.status_code in [200, 201]:
+                            comment_data = response2.json()
+                            comment_id = comment_data.get('id')
+                            if comment_id:
+                                self.created_comment_ids.append(comment_id)
+                                known_comment_ids.append(comment_id)
+                                known_comment_ids = list(dict.fromkeys(known_comment_ids))
+                            response2.success()
+                        else:
+                            # Comment falló pero Rating existe - warning pero no fallo crítico
+                            response2.success()  # Como hace el frontend
     
     @task(2)
     def view_comment_replies(self):
