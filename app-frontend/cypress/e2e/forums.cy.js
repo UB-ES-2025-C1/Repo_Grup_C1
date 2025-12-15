@@ -75,13 +75,18 @@ describe('Forums - funcionalidad de foros', () => {
       },
     }).as('getProfile')
 
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('access', 'fake-token')
-        win.localStorage.setItem('username', 'testuser')
-      },
+    // Configurar localStorage ANTES de visitar
+    cy.window().then((win) => {
+      win.localStorage.setItem('access', 'fake-token')
+      win.localStorage.setItem('username', 'testuser')
     })
 
+    cy.visit('/')
+
+    // Esperar a que la página se cargue completamente
+    cy.contains('CINEMA UB').should('be.visible')
+    
+    // Ahora hacer clic en Forums
     cy.contains('Forums').click()
 
     cy.url().should('include', '/forums')
