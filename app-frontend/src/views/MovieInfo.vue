@@ -318,7 +318,6 @@ async function deleteRating() {
     deleteSuccess.value = 'Rating and comment deleted successfully.';
     hasUserRating.value = false;
     ratingPreview.value = null;
-    commentsAll.value = []; // Clear comments after delete
 
     // Refresh movie data to update numVotes / average_rating
     try {
